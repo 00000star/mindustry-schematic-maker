@@ -283,10 +283,18 @@ def decode_schematic(data_or_path: Union[str, bytes]) -> Dict[str, Any]:
 
     if isinstance(data_or_path, str):
         cleaned = data_or_path.strip()
-        is_path_like = cleaned.endswith(".msch") or "/" in cleaned or "\\" in cleaned
 
-        # Try reading as file if path-like or if file exists
-        if is_path_like:
+        # Check for Base64 schematic string first
+        # Mindustry v7 schematics in Base64 start with "bXNjaAF" (header b"msch\x01")
+        if cleaned.startswith("bXNjaAF") or cleaned.startswith("b64:"):
+            if cleaned.startswith("b64:"):
+                cleaned = cleaned[4:]
+            padding = len(cleaned) % 4
+            if padding:
+                cleaned += "=" * (4 - padding)
+            raw_bytes = base64.b64decode(cleaned)
+        elif cleaned.endswith(".msch") or "/" in cleaned or "\\" in cleaned:
+            # File path logic
             try:
                 with open(cleaned, "rb") as f:
                     raw_bytes = f.read()
@@ -304,10 +312,7 @@ def decode_schematic(data_or_path: Union[str, bytes]) -> Dict[str, Any]:
                 except Exception as e:
                     raise FileNotFoundError(f"Could not read schematic file at {cleaned}: {e}")
         else:
-            # Assume base64 string
-            if cleaned.startswith("b64:"):
-                cleaned = cleaned[4:]
-            # Ensure proper base64 padding
+            # General Base64 string fallback
             padding = len(cleaned) % 4
             if padding:
                 cleaned += "=" * (4 - padding)
@@ -354,15 +359,4 @@ def decode_schematic(data_or_path: Union[str, bytes]) -> Dict[str, Any]:
             "block": block_name,
             "x": x,
             "y": y,
-            "config": cfg,
-            "rotation": rot,
-        })
-
-    return {
-        "name": tags.get("name", "Unnamed"),
-        "description": tags.get("description", ""),
-        "width": width,
-        "height": height,
-        "tags": tags,
-        "tiles": tiles,
-    }
+          

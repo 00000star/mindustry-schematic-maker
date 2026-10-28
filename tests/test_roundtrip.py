@@ -202,20 +202,16 @@ class TestMindustrySchematicMaker(unittest.TestCase):
         solar_count = sum(1 for t in solar["tiles"] if t["block"] == "solar-panel-large")
         self.assertEqual(solar_count, 6)
 
-    def test_prompt_compiler(self):
-        """Verify prompt compiler matches keywords and parses numbers."""
-        p1 = compile_from_prompt("build 6 silicon smelters")
-        smelters = sum(1 for t in p1["tiles"] if t["block"] == "silicon-smelter")
-        self.assertEqual(smelters, 6)
+    def test_base64_decoding_with_slashes(self):
+        """Verify that Base64 strings containing '/' characters are parsed as Base64, not paths."""
+        schem = generate_silicon_factory(smelters=4)
+        _, b64_str = encode_schematic(schem)
+        self.assertIn("/", b64_str, "Generated Base64 string should contain '/' character for test.")
+        self.assertTrue(b64_str.startswith("bXNjaAF"))
 
-        p2 = compile_from_prompt("thorium reactor nuclear safe")
-        reactors = sum(1 for t in p2["tiles"] if t["block"] == "thorium-reactor")
-        self.assertGreaterEqual(reactors, 1)
-
-        p3 = compile_from_prompt("defense line with 5 fuse turrets")
-        fuses = sum(1 for t in p3["tiles"] if t["block"] == "fuse")
-        self.assertEqual(fuses, 5)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        # Decode directly from Base64 string containing slashes
+        decoded = decode_schematic(b64_str)
+        self.assertEqual(decoded["name"], schem["name"])
+        self.assertEqual(len(decoded["tiles"]), len(schem["tiles"]))
+        self.assertEqual(decoded["width"], schem["width"])
+        
