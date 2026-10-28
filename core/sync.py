@@ -47,11 +47,11 @@ def save_to_project(schematic: Dict[str, Any], filename: Optional[str] = None) -
         with open(dest_path, "wb") as f:
             f.write(raw_bytes)
     except PermissionError:
-        # User space fallback
+        # Fallback using su
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             tmp.write(raw_bytes)
             tmp_path = tmp.name
-        cmd = f"su 10219 -G 9997 -G 1023 -c 'cp \"{tmp_path}\" \"{dest_path}\" && rm -f \"{tmp_path}\"'"
+        cmd = 'su -c \'cp "' + tmp_path + '" "' + dest_path + '" && chmod 664 "' + dest_path + '" && rm -f "' + tmp_path + '"\''
         subprocess.run(cmd, shell=True, check=True)
 
     return dest_path
@@ -141,6 +141,4 @@ def list_game_schematics() -> List[str]:
             files = [line.strip() for line in res.stdout.splitlines() if line.strip().endswith(".msch")]
             return files
     except Exception:
-        pass
-
-    return []
+      

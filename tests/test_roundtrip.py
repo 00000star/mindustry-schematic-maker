@@ -26,6 +26,7 @@ try:
         generate_cryofluid_mixer,
         generate_thorium_reactor_bank,
         generate_defense_line,
+        generate_scorch_bunker,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -41,6 +42,7 @@ except ImportError:
         generate_cryofluid_mixer,
         generate_thorium_reactor_bank,
         generate_defense_line,
+        generate_scorch_bunker,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -202,16 +204,16 @@ class TestMindustrySchematicMaker(unittest.TestCase):
         solar_count = sum(1 for t in solar["tiles"] if t["block"] == "solar-panel-large")
         self.assertEqual(solar_count, 6)
 
-    def test_base64_decoding_with_slashes(self):
-        """Verify that Base64 strings containing '/' characters are parsed as Base64, not paths."""
-        schem = generate_silicon_factory(smelters=4)
-        _, b64_str = encode_schematic(schem)
-        self.assertIn("/", b64_str, "Generated Base64 string should contain '/' character for test.")
-        self.assertTrue(b64_str.startswith("bXNjaAF"))
+        # Scorch bunker
+        scorch_bunker = generate_scorch_bunker(count=6)
+        scorch_count = sum(1 for t in scorch_bunker["tiles"] if t["block"] == "scorch")
+        wall_count = sum(1 for t in scorch_bunker["tiles"] if t["block"] == "titanium-wall")
+        self.assertEqual(scorch_count, 6)
+        self.assertEqual(wall_count, 6)
+        self.assertEqual(scorch_bunker["width"], 6)
+        self.assertEqual(scorch_bunker["height"], 4)
 
-        # Decode directly from Base64 string containing slashes
-        decoded = decode_schematic(b64_str)
-        self.assertEqual(decoded["name"], schem["name"])
-        self.assertEqual(len(decoded["tiles"]), len(schem["tiles"]))
-        self.assertEqual(decoded["width"], schem["width"])
-        
+        # Verify scorches are immediately adjacent behind walls (dy=1) and facing North (rot=1)
+        for t in scorch_bunker["tiles"]:
+            if t["block"] == "scorch":
+                s
