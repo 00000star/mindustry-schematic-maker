@@ -204,16 +204,78 @@ class TestMindustrySchematicMaker(unittest.TestCase):
         solar_count = sum(1 for t in solar["tiles"] if t["block"] == "solar-panel-large")
         self.assertEqual(solar_count, 6)
 
-        # Scorch bunker
-        scorch_bunker = generate_scorch_bunker(count=6)
+        # Scorch bunker / killbox choke
+        scorch_bunker = generate_scorch_bunker(count=5)
         scorch_count = sum(1 for t in scorch_bunker["tiles"] if t["block"] == "scorch")
         wall_count = sum(1 for t in scorch_bunker["tiles"] if t["block"] == "titanium-wall")
-        self.assertEqual(scorch_count, 6)
-        self.assertEqual(wall_count, 6)
-        self.assertEqual(scorch_bunker["width"], 6)
+        self.assertEqual(scorch_count, 5)
+        self.assertEqual(wall_count, 8)  # 4 on left flank, 4 on right flank
+        self.assertEqual(scorch_bunker["width"], 7)  # count + 2 = 7
         self.assertEqual(scorch_bunker["height"], 4)
 
-        # Verify scorches are immediately adjacent behind walls (dy=1) and facing North (rot=1)
+        # Verify front line (y=3) is OPEN at center for flame line of sight
+        front_center_tiles = [t for t in scorch_bunker["tiles"] if t["y"] == 3 and 1 <= t["x"] <= 5]
+        self.assertEqual(len(front_center_tiles), 0, "Front center (y=3) must be open for flame line of sight!")
+
+        # Verify scorches are facing North (rot=1) at y=2
         for t in scorch_bunker["tiles"]:
             if t["block"] == "scorch":
-                s
+                self.assertEqual(t["y"], 2)
+                self.assertEqual(t["rotation"], 1)
+
+        # Verify ammo manifold uses router and overflow-gate
+        ammo_tiles = {t["x"]: t["block"] for t in scorch_bunker["tiles"] if t["y"] == 1 and 1 <= t["x"] <= 5}
+        self.assertEqual(ammo_tiles[1], "router")
+        self.assertEqual(ammo_tiles[2], "overflow-gate")
+        self.assertEqual(ammo_tiles[3], "router")
+        self.assertEqual(ammo_tiles[4], "overflow-gate")
+        self.assertEqual(ammo_tiles[5], "router")
+
+    def test_scorch_bunker_generation(self):
+        """Verify Scorch bunker dimensions, flank walls, open line of sight, and prompt handling."""
+        bunker = generate_scorch_bunker(count=5)
+        self.assertEqual(bunker["width"], 7)  # 5 + 2 flank walls
+        self.assertEqual(bunker["height"], 4)
+        self.assertIn("Killbox", bunker["name"])
+
+        # Prompt compiler check for 'scorch', 'killbox', and typo 'scrotch'
+        p1 = compile_from_prompt("scorch bunker 6")
+        self.assertEqual(sum(1 for t in p1["tiles"] if t["block"] == "scorch"), 6)
+
+        p2 = compile_from_prompt("build 6 scrotch defense")
+        self.assertEqual(sum(1 for t in p2["tiles"] if t["block"] == "scorch"), 6)
+
+        p3 = compile_from_prompt("scorch killbox 5")
+        self.assertEqual(sum(1 for t in p3["tiles"] if t["block"] == "scorch"), 5)
+
+    def test_base64_decoding_with_slashes(self):
+        """Verify that Base64 strings containing '/' characters are parsed as Base64, not paths."""
+        schem = generate_silicon_factory(smelters=4)
+        _, b64_str = encode_schematic(schem)
+        self.assertIn("/", b64_str, "Generated Base64 string should contain '/' character for test.")
+        self.assertTrue(b64_str.startswith("bXNjaAF"))
+
+        # Decode directly from Base64 string containing slashes
+        decoded = decode_schematic(b64_str)
+        self.assertEqual(decoded["name"], schem["name"])
+        self.assertEqual(len(decoded["tiles"]), len(schem["tiles"]))
+        self.assertEqual(decoded["width"], schem["width"])
+        self.assertEqual(decoded["height"], schem["height"])
+
+    def test_prompt_compiler(self):
+        """Verify prompt compiler matches keywords and parses numbers."""
+        p1 = compile_from_prompt("build 6 silicon smelters")
+        smelters = sum(1 for t in p1["tiles"] if t["block"] == "silicon-smelter")
+        self.assertEqual(smelters, 6)
+
+        p2 = compile_from_prompt("thorium reactor nuclear safe")
+        reactors = sum(1 for t in p2["tiles"] if t["block"] == "thorium-reactor")
+        self.assertGreaterEqual(reactors, 1)
+
+        p3 = compile_from_prompt("defense line with 5 fuse turrets")
+        fuses = sum(1 for t in p3["tiles"] if t["block"] == "fuse")
+        self.assertEqual(fuses, 5)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -141,4 +141,6 @@ def list_game_schematics() -> List[str]:
             files = [line.strip() for line in res.stdout.splitlines() if line.strip().endswith(".msch")]
             return files
     except Exception:
-      
+        pass
+
+    return []

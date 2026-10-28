@@ -359,4 +359,15 @@ def decode_schematic(data_or_path: Union[str, bytes]) -> Dict[str, Any]:
             "block": block_name,
             "x": x,
             "y": y,
-          
+            "config": cfg,
+            "rotation": rot,
+        })
+
+    return {
+        "name": tags.get("name", "Unnamed"),
+        "description": tags.get("description", ""),
+        "width": width,
+        "height": height,
+        "tags": tags,
+        "tiles": tiles,
+    }

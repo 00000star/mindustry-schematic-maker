@@ -317,46 +317,56 @@ def generate_defense_line(turret: str = "salvo", count: int = 4) -> Dict[str, An
     return builder.build()
 
 
-def generate_scorch_bunker(count: int = 6) -> Dict[str, Any]:
+def generate_scorch_bunker(count: int = 5) -> Dict[str, Any]:
     """
-    Generate an ultra-compact Scorch point-blank bunker line.
-    Scorch has extreme close-range DPS but short range (6 tiles).
+    Generate an optimized Scorch Killbox Choke layout.
+    Scorch has extreme point-blank DPS but short range (6 tiles) and flames
+    do NOT pass through walls. This layout uses open frontline line-of-sight
+    with flank walls creating a deadly choke funnel, and an alternating
+    Router/Overflow-Gate manifold feeding every turret.
     Layout:
-      - y=3: Frontline Titanium Wall line (x=0..count-1)
-      - y=2: Solid row of Scorches facing North (rotation=1) to shoot through walls
-      - y=1: Router / conveyor ammo distribution line (x=0..count-1)
-      - y=0: Support row with Mender (wall repair), Power Node, and Ammo feed conveyor
+      - y=3: Front Line - Flank walls at x=0 and x=count+1. Center (x=1..count) is OPEN.
+      - y=2: Combat Line - Flank walls at x=0 and x=count+1. Center (x=1..count): Scorches (rotation=1 North).
+      - y=1: Ammo Manifold - Flank walls at x=0 and x=count+1. Center (x=1..count): alternating Router and Overflow-Gate.
+      - y=0: Support / Rear - Flank walls at x=0 and x=count+1. Ammo input conveyor at (1, 0) (rotation=1 North).
+             Mender at center, Power Node adjacent.
     """
     builder = SchematicBuilder(
-        name=f"Scorch Bunker ({count}x)",
-        description=f"Point-blank defense bunker with {count} North-facing Scorches behind Titanium Walls."
+        name=f"Scorch Killbox Choke ({count}x)",
+        description=f"Deadly close-range choke with {count} North-facing Scorches, open line-of-sight, flank walls, and router-overflow ammo manifold."
     )
 
-    # 1. Frontline Titanium Wall (y=3)
-    for x in range(count):
-        builder.add("titanium-wall", x, 3)
+    right_flank_x = count + 1
 
-    # 2. Scorches facing North (y=2, rotation=1)
-    for x in range(count):
+    # 1. Flank Walls on left (x=0) and right (x=count+1)
+    for y in range(4):
+        builder.add("titanium-wall", 0, y)
+        builder.add("titanium-wall", right_flank_x, y)
+
+    # 2. Combat Line (y=2): Scorches facing North (rotation=1)
+    # y=3 is intentionally left OPEN in front of scorches (x=1..count) for unobstructed line of sight
+    for x in range(1, count + 1):
         builder.add("scorch", x, 2, rotation=1)
 
-    # 3. Ammo distribution line (y=1)
-    for x in range(count):
-        if x % 2 == 0:
+    # 3. Ammo Manifold (y=1): Alternating router and overflow-gate
+    for x in range(1, count + 1):
+        if (x - 1) % 2 == 0:
             builder.add("router", x, 1)
         else:
-            builder.add("conveyor", x, 1, rotation=0)
+            builder.add("overflow-gate", x, 1)
 
-    # 4. Support row (y=0)
-    # Ammo feed conveyor into first router
-    builder.add("conveyor", 0, 0, rotation=1)
+    # 4. Support / Rear (y=0)
+    # Ammo input conveyor feeding the first router at (1, 1)
+    builder.add("conveyor", 1, 0, rotation=1)
 
-    # Mender at center to maintain front wall HP
-    center_x = max(1, count // 2)
+    # Mender at center (for count=5, center is x=3)
+    center_x = max(2, (count + 2) // 2)
     builder.add("mender", center_x, 0)
 
-    # Power node for mender
-    node_x = center_x + 1 if center_x + 1 < count else center_x - 1
+    # Power Node adjacent to mender
+    node_x = center_x + 1 if center_x + 1 < right_flank_x else center_x - 1
+    if node_x == 1:  # Don't overwrite conveyor at (1, 0)
+        node_x = center_x + 1
     builder.add("power-node", node_x, 0)
 
     return builder.build()
@@ -402,4 +412,24 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
     count = 4
     match = re.search(r"\b(\d+)\b", text)
     if match:
-        count = max(1, min(int(match.gro
+        count = max(1, min(int(match.group(1)), 32))
+
+    # Match prompt intents
+    if "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:
+        return generate_scorch_bunker(count=count)
+
+    elif "silicon" in text or "smelter" in text:
+        return generate_silicon_factory(smelters=count)
+
+    elif "graphite" in text or "press" in text:
+        return generate_graphite_press(presses=count)
+
+    elif "metaglass" in text or "kiln" in text:
+        return generate_metaglass_kiln(kilns=count)
+
+    elif "cryo" in text or "cryofluid" in text:
+        mixers = max(1, count // 2 if count > 2 else count)
+        return generate_cryofluid_mixer(mixers=mixers)
+
+    elif "thorium" in text or "reactor" in text or "nuclear" in text or "nuke" in text:
+        reactors = max(1, count if count <= 4 else count // 
