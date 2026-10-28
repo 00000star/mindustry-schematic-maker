@@ -372,6 +372,61 @@ def generate_scorch_bunker(count: int = 5) -> Dict[str, Any]:
     return builder.build()
 
 
+def generate_water_cooled_duo_fortress(width: int = 8) -> Dict[str, Any]:
+    """
+    High-density defensive fortress packing 13 Water-Cooled Duos behind frontline
+    Titanium Walls with continuous router-overflow ammo feed and bridge conduit liquid cooling.
+    """
+    builder = SchematicBuilder(
+        name="Water-Cooled Duo Fortress (13x)",
+        description="High-density defensive fortress packing 13 Water-Cooled Duos behind frontline Titanium Walls with continuous router-overflow ammo feed and bridge conduit liquid cooling."
+    )
+
+    # Row 5 (y=5): 8x titanium-wall at x=0..7
+    for x in range(8):
+        builder.add("titanium-wall", x, 5)
+
+    # Row 4 (y=4): x=1,4,7 are conduit (rotation=1 North); x=0,2,3,5,6 are duo (rotation=1 North)
+    for x in range(8):
+        if x in (1, 4, 7):
+            builder.add("conduit", x, 4, rotation=1)
+        else:
+            builder.add("duo", x, 4, rotation=1)
+
+    # Row 3 (y=3): x=0,2,4,6 are router (rot=0); x=1,3,5,7 are overflow-gate (rot=0)
+    for x in range(8):
+        if x in (0, 2, 4, 6):
+            builder.add("router", x, 3, rotation=0)
+        else:
+            builder.add("overflow-gate", x, 3, rotation=0)
+
+    # Row 2 (y=2): 8x duo at x=0..7 (rot=1 North)
+    for x in range(8):
+        builder.add("duo", x, 2, rotation=1)
+
+    # Row 1 (y=1): x=1,4,7 are bridge-conduit (rot=1 North, config=('point2', 0, 3)); x=0,2,3,5,6 are conduit (rot=0 East)
+    for x in range(8):
+        if x in (1, 4, 7):
+            builder.add("bridge-conduit", x, 1, rotation=1, config=("point2", 0, 3))
+        else:
+            builder.add("conduit", x, 1, rotation=0)
+
+    # Row 0 (y=0):
+    # (0, 0): bridge-conveyor (rot=1 North, config=('point2', 0, 3)) [ammo inlet]
+    # (7, 0): conduit (rot=1 North) [water inlet]
+    # (1, 0), (2, 0), (5, 0), (6, 0): titanium-wall
+    # (3, 0): mender
+    # (4, 0): power-node
+    builder.add("bridge-conveyor", 0, 0, rotation=1, config=("point2", 0, 3))
+    builder.add("conduit", 7, 0, rotation=1)
+    for x in (1, 2, 5, 6):
+        builder.add("titanium-wall", x, 0)
+    builder.add("mender", 3, 0)
+    builder.add("power-node", 4, 0)
+
+    return builder.build()
+
+
 def generate_solar_battery_array(rows: int = 2, cols: int = 3) -> Dict[str, Any]:
     """Generate a clean compact solar panel and battery grid."""
     builder = SchematicBuilder(
@@ -432,4 +487,26 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
         return generate_cryofluid_mixer(mixers=mixers)
 
     elif "thorium" in text or "reactor" in text or "nuclear" in text or "nuke" in text:
-        reactors = max(1, count if count <= 4 else count // 
+        reactors = max(1, count if count <= 4 else count // 2)
+        with_logic = "no logic" not in text and "without logic" not in text
+        return generate_thorium_reactor_bank(reactors=reactors, with_logic=with_logic)
+
+    elif "solar" in text or "battery" in text or "power" in text:
+        cols = max(2, min(count, 5))
+        rows = 2
+        return generate_solar_battery_array(rows=rows, cols=cols)
+
+    elif ("water" in text or "cooled" in text or "coolant" in text) and "duo" in text:
+        return generate_water_cooled_duo_fortress(width=8)
+
+    elif "defense" in text or "wall" in text or "turret" in text or "salvo" in text or "duo" in text or "scatter" in text or "lancer" in text:
+        turret = "salvo"
+        for candidate in ["duo", "scatter", "lancer", "salvo", "fuse", "cyclone", "ripple"]:
+            if candidate in text:
+                turret = candidate
+                break
+        return generate_defense_line(turret=turret, count=count)
+
+    else:
+        # Default fallback: silicon factory
+        return generate_silicon_factory(smelters=count)

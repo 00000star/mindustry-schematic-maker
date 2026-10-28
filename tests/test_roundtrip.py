@@ -27,6 +27,7 @@ try:
         generate_thorium_reactor_bank,
         generate_defense_line,
         generate_scorch_bunker,
+        generate_water_cooled_duo_fortress,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -43,6 +44,7 @@ except ImportError:
         generate_thorium_reactor_bank,
         generate_defense_line,
         generate_scorch_bunker,
+        generate_water_cooled_duo_fortress,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -247,6 +249,44 @@ class TestMindustrySchematicMaker(unittest.TestCase):
 
         p3 = compile_from_prompt("scorch killbox 5")
         self.assertEqual(sum(1 for t in p3["tiles"] if t["block"] == "scorch"), 5)
+
+    def test_water_cooled_duo_fortress(self):
+        """Verify Water-Cooled Duo Fortress layout, counts, roundtrip encode/decode, and prompt matching."""
+        fortress = generate_water_cooled_duo_fortress(width=8)
+        self.assertEqual(fortress["width"], 8)
+        self.assertEqual(fortress["height"], 6)
+        self.assertEqual(len(fortress["tiles"]), 48)
+
+        # Count block types
+        from collections import Counter
+        counts = Counter(t["block"] for t in fortress["tiles"])
+        self.assertEqual(counts["duo"], 13)
+        self.assertEqual(counts["titanium-wall"], 12)
+        self.assertEqual(counts["conduit"], 9)
+        self.assertEqual(counts["router"], 4)
+        self.assertEqual(counts["overflow-gate"], 4)
+        self.assertEqual(counts["bridge-conduit"], 3)
+        self.assertEqual(counts["bridge-conveyor"], 1)
+        self.assertEqual(counts["mender"], 1)
+        self.assertEqual(counts["power-node"], 1)
+
+        # Verify roundtrip encode and decode fidelity
+        raw_bytes, b64_str = encode_schematic(fortress)
+        self.assertEqual(len(b64_str) % 4, 0, "Base64 string length must be divisible by 4.")
+        decoded = decode_schematic(raw_bytes)
+        self.assertEqual(decoded["name"], fortress["name"])
+        self.assertEqual(decoded["width"], 8)
+        self.assertEqual(decoded["height"], 6)
+        self.assertEqual(len(decoded["tiles"]), 48)
+
+        decoded_b64 = decode_schematic(b64_str)
+        self.assertEqual(decoded_b64["name"], fortress["name"])
+        self.assertEqual(len(decoded_b64["tiles"]), 48)
+
+        # Verify prompt compiler matching
+        compiled = compile_from_prompt("water cooled duos with walls")
+        self.assertEqual(compiled["name"], "Water-Cooled Duo Fortress (13x)")
+        self.assertEqual(len(compiled["tiles"]), 48)
 
     def test_base64_decoding_with_slashes(self):
         """Verify that Base64 strings containing '/' characters are parsed as Base64, not paths."""
