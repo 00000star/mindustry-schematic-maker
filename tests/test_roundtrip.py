@@ -18,6 +18,7 @@ try:
     from core.blocks import get_block, get_item_id, get_liquid_id
     from core.codec import encode_schematic, decode_schematic
     from core.renderer import render_schematic_ascii
+    from core.visual_renderer import render_schematic_png
     from core.generator import (
         SchematicBuilder,
         generate_silicon_factory,
@@ -28,6 +29,7 @@ try:
         generate_defense_line,
         generate_scorch_bunker,
         generate_water_cooled_duo_fortress,
+        generate_community_duo_fortress,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -35,6 +37,7 @@ except ImportError:
     from blocks import get_block, get_item_id, get_liquid_id
     from codec import encode_schematic, decode_schematic
     from renderer import render_schematic_ascii
+    from visual_renderer import render_schematic_png
     from generator import (
         SchematicBuilder,
         generate_silicon_factory,
@@ -45,6 +48,7 @@ except ImportError:
         generate_defense_line,
         generate_scorch_bunker,
         generate_water_cooled_duo_fortress,
+        generate_community_duo_fortress,
         generate_solar_battery_array,
         compile_from_prompt,
     )
@@ -285,8 +289,49 @@ class TestMindustrySchematicMaker(unittest.TestCase):
 
         # Verify prompt compiler matching
         compiled = compile_from_prompt("water cooled duos with walls")
-        self.assertEqual(compiled["name"], "Water-Cooled Duo Fortress (13x)")
-        self.assertEqual(len(compiled["tiles"]), 48)
+        self.assertEqual(compiled["name"], "Community Duo Fortress (Overdriven)")
+        self.assertEqual(len(compiled["tiles"]), 49)
+
+    def test_community_duo_fortress(self):
+        """Verify Community Duo Fortress architecture, paired bridge conveyors, visual PNG rendering, and prompt compilation."""
+        fortress = generate_community_duo_fortress()
+        self.assertEqual(fortress["width"], 7)
+        self.assertEqual(fortress["height"], 7)
+        self.assertIn("Community Duo Fortress", fortress["name"])
+
+        # Verify key blocks present
+        from collections import Counter
+        counts = Counter(t["block"] for t in fortress["tiles"])
+        self.assertGreater(counts["duo"], 10)
+        self.assertEqual(counts["overdrive-projector"], 1)
+        self.assertEqual(counts["bridge-conveyor"], 4)
+        self.assertEqual(counts["underflow-gate"], 4)
+        self.assertEqual(counts["router"], 4)
+        self.assertEqual(counts["mender"], 1)
+        self.assertEqual(counts["power-node"], 1)
+        self.assertEqual(counts["titanium-wall"], 12)
+
+        # Verify 100% paired bridge links: (0, 3) -> (2, 3) -> (4, 3) -> (6, 3)
+        bridges = {t["x"]: t for t in fortress["tiles"] if t["block"] == "bridge-conveyor" and t["y"] == 3}
+        self.assertEqual(bridges[0]["config"], ("point2", 2, 0))
+        self.assertEqual(bridges[2]["config"], ("point2", 2, 0))
+        self.assertEqual(bridges[4]["config"], ("point2", 2, 0))
+        self.assertEqual(bridges[6]["config"], ("point2", -1, -1))
+
+        # Verify pure Python visual PNG renderer
+        png_bytes = render_schematic_png(fortress)
+        self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"), "Output must start with valid PNG header")
+        self.assertGreater(len(png_bytes), 500)
+
+        # Verify binary roundtrip
+        raw_bytes, b64_str = encode_schematic(fortress)
+        decoded = decode_schematic(raw_bytes)
+        self.assertEqual(decoded["name"], fortress["name"])
+        self.assertEqual(len(decoded["tiles"]), len(fortress["tiles"]))
+
+        # Verify prompt compiler mapping
+        compiled = compile_from_prompt("community duo fortress")
+        self.assertEqual(compiled["name"], "Community Duo Fortress (Overdriven)")
 
     def test_base64_decoding_with_slashes(self):
         """Verify that Base64 strings containing '/' characters are parsed as Base64, not paths."""

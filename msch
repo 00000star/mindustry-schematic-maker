@@ -18,11 +18,13 @@ if SCRIPT_DIR not in sys.path:
 try:
     from core.codec import encode_schematic, decode_schematic
     from core.renderer import render_schematic_ascii
+    from core.visual_renderer import render_schematic_png
     from core.generator import compile_from_prompt
     from core.sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
 except ImportError:
     from codec import encode_schematic, decode_schematic
     from renderer import render_schematic_ascii
+    from visual_renderer import render_schematic_png
     from generator import compile_from_prompt
     from sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
 
@@ -57,12 +59,28 @@ def cmd_make(args):
         else:
             print(f"[-] Game sync warning: {msg}")
 
+    # Render PNG image if requested
+    if getattr(args, "image", None):
+        png_bytes = render_schematic_png(schematic)
+        out_path = os.path.abspath(args.image)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "wb") as f:
+            f.write(png_bytes)
+        print(f"[+] Visual PNG preview saved to: {out_path}")
+
 
 def cmd_preview(args):
     target = args.target
     try:
         schematic = decode_schematic(target)
         print(render_schematic_ascii(schematic))
+        if getattr(args, "image", None):
+            png_bytes = render_schematic_png(schematic)
+            out_path = os.path.abspath(args.image)
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "wb") as f:
+                f.write(png_bytes)
+            print(f"[+] Visual PNG preview saved to: {out_path}")
     except Exception as e:
         print(f"Error decoding schematic: {e}")
         sys.exit(1)
@@ -136,10 +154,12 @@ def main():
     p_make = subparsers.add_parser("make", help="Generate schematic from prompt")
     p_make.add_argument("prompt", nargs="+", help="Prompt description (e.g. '4 silicon smelter')")
     p_make.add_argument("--sync", action="store_true", help="Sync directly to Mindustry game directory")
+    p_make.add_argument("--image", help="Output path for visual PNG graphic")
 
     # preview
     p_prev = subparsers.add_parser("preview", help="Render ASCII preview of a schematic")
     p_prev.add_argument("target", help="File path or Base64 schematic string")
+    p_prev.add_argument("--image", help="Output path for visual PNG graphic")
 
     # decode
     p_dec = subparsers.add_parser("decode", help="Decode schematic to structured JSON")

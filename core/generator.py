@@ -446,6 +446,66 @@ def generate_solar_battery_array(rows: int = 2, cols: int = 3) -> Dict[str, Any]
     return builder.build()
 
 
+def generate_community_duo_fortress() -> Dict[str, Any]:
+    """
+    High-density defensive fortress with 16 Duos powered by central Overdrive Projector
+    (1.5x fire rate) and Underflow Gate manifolds behind frontline Titanium Walls.
+    Learned from community architectures with 100% paired bridge conveyors.
+    """
+    builder = SchematicBuilder(
+        name="Community Duo Fortress (Overdriven)",
+        description="High-density defensive fortress with 16 Duos powered by central Overdrive Projector (1.5x fire rate) and Underflow Gate manifolds behind frontline Titanium Walls."
+    )
+
+    # Row 6 (y=6): 7x titanium-wall frontline defense
+    for x in range(7):
+        builder.add("titanium-wall", x, 6)
+
+    # Row 5 (y=5): duos at x=0, 1, 3, 5, 6; routers at x=2, 4
+    for x in (0, 1, 3, 5, 6):
+        builder.add("duo", x, 5, rotation=1)
+    builder.add("router", 2, 5, rotation=0)
+    builder.add("router", 4, 5, rotation=0)
+
+    # Row 4 (y=4): duos at x=0, 1, 3, 5, 6; underflow-gates at x=2, 4
+    for x in (0, 1, 3, 5, 6):
+        builder.add("duo", x, 4, rotation=1)
+    builder.add("underflow-gate", 2, 4, rotation=0)
+    builder.add("underflow-gate", 4, 4, rotation=0)
+
+    # Row 3 (y=3): Ammo bus with paired bridges and central Overdrive Projector
+    # Hop 1: x=0 -> x=2 (+2, 0)
+    # Hop 2: x=2 -> x=4 (+2, 0)
+    # Hop 3: x=4 -> x=6 (+2, 0)
+    builder.add("bridge-conveyor", 0, 3, rotation=0, config=("point2", 2, 0))
+    builder.add("duo", 1, 3, rotation=1)
+    builder.add("bridge-conveyor", 2, 3, rotation=0, config=("point2", 2, 0))
+    builder.add("overdrive-projector", 3, 3, rotation=0)
+    builder.add("bridge-conveyor", 4, 3, rotation=0, config=("point2", 2, 0))
+    builder.add("duo", 5, 3, rotation=1)
+    builder.add("bridge-conveyor", 6, 3, rotation=0, config=("point2", -1, -1))
+
+    # Row 2 (y=2): duos at x=0, 1, 3, 5, 6; underflow-gates at x=2, 4
+    for x in (0, 1, 3, 5, 6):
+        builder.add("duo", x, 2, rotation=1)
+    builder.add("underflow-gate", 2, 2, rotation=0)
+    builder.add("underflow-gate", 4, 2, rotation=0)
+
+    # Row 1 (y=1): duos at x=0, 1, 3, 5, 6; routers at x=2, 4
+    for x in (0, 1, 3, 5, 6):
+        builder.add("duo", x, 1, rotation=1)
+    builder.add("router", 2, 1, rotation=0)
+    builder.add("router", 4, 1, rotation=0)
+
+    # Row 0 (y=0): Base anchors, Mender and Power Node
+    for x in (0, 1, 4, 5, 6):
+        builder.add("titanium-wall", x, 0)
+    builder.add("mender", 2, 0)
+    builder.add("power-node", 3, 0)
+
+    return builder.build()
+
+
 # ==============================================================================
 # Natural Language Prompt Compiler
 # ==============================================================================
@@ -470,7 +530,10 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
         count = max(1, min(int(match.group(1)), 32))
 
     # Match prompt intents
-    if "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:
+    if "duo" in text and ("fortress" in text or "overdrive" in text or "defense" in text or "community" in text or "water" in text):
+        return generate_community_duo_fortress()
+
+    elif "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:
         return generate_scorch_bunker(count=count)
 
     elif "silicon" in text or "smelter" in text:
