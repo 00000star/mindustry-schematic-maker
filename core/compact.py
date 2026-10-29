@@ -319,4 +319,177 @@ def synthesize_factory(
     schem = builder.build()
     validation = validate_schematic(schem, inlets=builder.inlets)
     if not validation.is_valid:
-        raise ValueError(f"Generated factory 
+        raise ValueError(f"Generated factory failed validation: {'; '.join(validation.errors)}")
+
+    # Supply Verification Gate
+    supply_report = trace_supply(schem, inlets=builder.inlets)
+    missing = supply_report.missing_demands()
+    if missing:
+        missing_desc = [f"{m['block']} at ({m['x']},{m['y']}) missing {m['missing']}" for m in missing]
+        raise ValueError(f"Generated factory has unsupplied crafters: {'; '.join(missing_desc)}")
+
+    return schem
+
+
+def synthesize_power_plant(
+    tech_type: str = "thorium-reactor",
+    count: int = 4,
+) -> Dict[str, Any]:
+    """
+    Synthesize fail-safe, continuous-flow power plant architectures.
+    Supports:
+      - thorium-reactor (3x3 footprint, 100% fail-safe cryofluid coolant guarantee before thorium feed)
+      - steam-generator (2x2 footprint, balanced coal conveyor + water conduit routing)
+    """
+    cleaned = tech_type.strip().lower().replace(" ", "-")
+    if cleaned in ("thorium", "thorium-reactor", "nuclear", "nuke"):
+        p_type = "thorium-reactor"
+    elif cleaned in ("steam", "steam-generator"):
+        p_type = "steam-generator"
+    else:
+        p_type = cleaned
+
+    phys = get_block_physics(p_type)
+    title = f"Synthesized {p_type.replace('-', ' ').title()} Bank ({count}x)"
+    desc = f"Verified {p_type} power generation facility ({count} units) with fail-safe supply."
+    builder = SchematicBuilder(name=title, description=desc)
+
+    if p_type == "thorium-reactor":
+        width_per_unit = 3
+        total_w = count * width_per_unit
+
+        for i in range(count):
+            bx = i * width_per_unit
+            # Row 0: Cryofluid line. Liquid router at (bx+1, 0) feeds North into reactor
+            builder.add("conduit", bx, 0, rotation=0)
+            builder.add("liquid-router", bx + 1, 0)
+            builder.add("conduit", bx + 2, 0, rotation=0)
+
+            # Rows 1..3: Thorium Reactor (3x3)
+            builder.add("thorium-reactor", bx, 1)
+
+            # Row 4: Thorium conveyor line. Item router at (bx+1, 4) feeds South into reactor
+            builder.add("conveyor", bx, 4, rotation=0)
+            builder.add("router", bx + 1, 4)
+            builder.add("conveyor", bx + 2, 4, rotation=0)
+
+            # Row 5: Power node line
+            builder.add("power-node", bx + 1, 5)
+
+        builder.inlet(0, 0, "cryofluid")
+        builder.inlet(0, 4, "thorium")
+
+    elif p_type == "steam-generator":
+        width_per_unit = 2
+        total_w = count * width_per_unit
+
+        for i in range(count):
+            bx = i * width_per_unit
+            # Row 0: Water conduit line. Liquid router at (bx, 0) feeds North into generator
+            builder.add("liquid-router", bx, 0)
+            builder.add("conduit", bx + 1, 0, rotation=0)
+
+            # Rows 1..2: Steam Generator (2x2)
+            builder.add("steam-generator", bx, 1)
+
+            # Row 3: Coal conveyor line. Item router at (bx, 3) feeds South into generator
+            builder.add("router", bx, 3)
+            builder.add("conveyor", bx + 1, 3, rotation=0)
+
+            # Row 4: Power node line
+            builder.add("power-node", bx, 4)
+
+        builder.inlet(0, 0, "water")
+        builder.inlet(0, 3, "coal")
+
+    else:
+        raise ValueError(f"Unsupported power plant tech type: '{tech_type}'")
+
+    # Static Validation Gate
+    schem = builder.build()
+    validation = validate_schematic(schem, inlets=builder.inlets)
+    if not validation.is_valid:
+        raise ValueError(f"Generated power plant failed validation: {'; '.join(validation.errors)}")
+
+    # Supply Verification Gate
+    supply_report = trace_supply(schem, inlets=builder.inlets)
+    missing = supply_report.missing_demands()
+    if missing:
+        missing_desc = [f"{m['block']} at ({m['x']},{m['y']}) missing {m['missing']}" for m in missing]
+        raise ValueError(f"Generated power plant has unsupplied reactors: {'; '.join(missing_desc)}")
+
+    return schem
+
+
+def build_nested_artillery_module(
+    turret_name: str = "hail",
+    width: int = 7,
+    height: int = 7,
+) -> Dict[str, Any]:
+    """
+    Generate an ultra-compact nested 7x7 water-cooled artillery module.
+    Features:
+      - 3 alternating columns of 6 turrets (18 turrets total)
+      - Col 0: router column (ammo)
+      - Col 1: turret column
+      - Col 2: liquid-router column (water coolant)
+      - Col 3: turret column
+      - Col 4: router column (ammo)
+      - Col 5: turret column
+      - Col 6: liquid-router column (water coolant)
+      - Row 0 Dual Underfloor Bridge Feeders
+    """
+    cleaned = turret_name.strip().lower().replace(" ", "-")
+    phys = get_block_physics(cleaned)
+    if phys.size != 1:
+        raise ValueError(
+            f"Nested module currently only supports 1x1 turrets, got {cleaned} (size {phys.size})"
+        )
+
+    turret_title = cleaned.replace("-", " ").title()
+    title = f"Nested Water-Cooled {turret_title} Module (18x)"
+    desc = f"7x7 nested water-cooled {cleaned} fortification with dual underfloor bridge distribution."
+    builder = SchematicBuilder(name=title, description=desc)
+
+    # Row 0: Dual Underfloor Bridge Feeders
+    builder.add("router", 0, 0, rotation=0)
+    builder.add("bridge-conveyor", 1, 0, rotation=0, config=("point2", 3, 0))
+    builder.add("liquid-router", 2, 0, rotation=0)
+    builder.add("bridge-conduit", 3, 0, rotation=0, config=("point2", 3, 0))
+    builder.add("bridge-conveyor", 4, 0, rotation=1, config=("point2", -1, -1))
+    builder.add("power-node", 5, 0, rotation=0)
+    builder.add("bridge-conduit", 6, 0, rotation=1, config=("point2", -1, -1))
+
+    # Rows 1 to 6 (y=1..6):
+    for y in range(1, height):
+        builder.add("router", 0, y, rotation=0)
+        builder.add(cleaned, 1, y, rotation=0)
+        builder.add("liquid-router", 2, y, rotation=0)
+        builder.add(cleaned, 3, y, rotation=0)
+        builder.add("router", 4, y, rotation=0)
+        builder.add(cleaned, 5, y, rotation=0)
+        builder.add("liquid-router", 6, y, rotation=0)
+
+    # Declared Inlets
+    ammo_item = "graphite" if cleaned == "hail" else "copper"
+    builder.inlet(0, 0, ammo_item)
+    builder.inlet(2, 0, "water")
+    builder.inlet(5, 0, "power")
+
+    schem = builder.build()
+    validation = validate_schematic(schem, inlets=builder.inlets)
+    if not validation.is_valid:
+        raise ValueError(f"Generated nested module failed validation: {'; '.join(validation.errors)}")
+
+    report = trace_supply(schem, inlets=builder.inlets)
+    missing = report.missing_demands()
+    if missing:
+        missing_desc = [f"{m['block']} at ({m['x']},{m['y']}) missing {m['missing']}" for m in missing]
+        raise ValueError(f"Generated nested module has unsupplied consumers: {'; '.join(missing_desc)}")
+
+    return schem
+
+
+# Backwards compatibility aliases
+build_compact_defense = synthesize_compact_defense
+build_compact_factory = synthesize_factory

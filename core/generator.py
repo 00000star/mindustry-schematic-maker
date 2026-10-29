@@ -643,4 +643,58 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
 
     elif "plastanium" in text and ("compressor" in text or "factory" in text):
         try:
-            from .compact import synthesize_
+            from .compact import synthesize_factory
+        except ImportError:
+            from core.compact import synthesize_factory
+        return synthesize_factory("plastanium-compressor", count=count)
+
+    elif "steam" in text and ("generator" in text or "power" in text or "plant" in text):
+        try:
+            from .compact import synthesize_power_plant
+        except ImportError:
+            from core.compact import synthesize_power_plant
+        return synthesize_power_plant("steam-generator", count=count)
+
+    elif "duo" in text and ("fortress" in text or "defense" in text):
+        return generate_community_duo_fortress()
+
+    elif "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:
+        return generate_scorch_bunker(count=count)
+
+    elif "silicon" in text or "smelter" in text:
+        return generate_silicon_factory(smelters=count)
+
+    elif "graphite" in text or "press" in text:
+        return generate_graphite_press(presses=count)
+
+    elif "metaglass" in text or "kiln" in text:
+        return generate_metaglass_kiln(kilns=count)
+
+    elif "cryo" in text or "cryofluid" in text:
+        mixers = max(1, count // 2 if count > 2 else count)
+        return generate_cryofluid_mixer(mixers=mixers)
+
+    elif "thorium" in text or "reactor" in text or "nuclear" in text or "nuke" in text:
+        reactors = max(1, count if count <= 4 else count // 2)
+        with_logic = "no logic" not in text and "without logic" not in text
+        return generate_thorium_reactor_bank(reactors=reactors, with_logic=with_logic)
+
+    elif "solar" in text or "battery" in text or "power" in text:
+        cols = max(2, min(count, 5))
+        rows = 2
+        return generate_solar_battery_array(rows=rows, cols=cols)
+
+    elif ("water" in text or "cooled" in text or "coolant" in text) and "duo" in text:
+        return generate_water_cooled_duo_fortress(width=8)
+
+    elif "defense" in text or "wall" in text or "turret" in text or "salvo" in text or "duo" in text or "scatter" in text or "lancer" in text or "hail" in text:
+        turret = "salvo"
+        for candidate in ["duo", "scatter", "lancer", "salvo", "fuse", "cyclone", "ripple", "hail"]:
+            if candidate in text:
+                turret = candidate
+                break
+        return generate_defense_line(turret=turret, count=count)
+
+    else:
+        # Default fallback: silicon factory
+        return generate_silicon_factory(smelters=count)
