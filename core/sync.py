@@ -48,11 +48,21 @@ def save_to_project(schematic: Dict[str, Any], filename: Optional[str] = None) -
             f.write(raw_bytes)
     except PermissionError:
         # Fallback using su
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(raw_bytes)
-            tmp_path = tmp.name
-        cmd = 'su -c \'cp "' + tmp_path + '" "' + dest_path + '" && chmod 664 "' + dest_path + '" && rm -f "' + tmp_path + '"\''
-        subprocess.run(cmd, shell=True, check=True)
+        subprocess.run("su -c 'chmod 755 /storage /storage/emulated' 2>/dev/null || true", shell=True)
+        try:
+            with open(dest_path, "wb") as f:
+                f.write(raw_bytes)
+        except Exception:
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                tmp.write(raw_bytes)
+                tmp_path = tmp.name
+            cmd = (
+                f'su -c \'cat "{tmp_path}" > "{dest_path}" && '
+                f'chmod 664 "{dest_path}" 2>/dev/null || true && '
+                f'chown 10219:10219 "{dest_path}" 2>/dev/null || true && '
+                f'rm -f "{tmp_path}"\''
+            )
+            subprocess.run(cmd, shell=True, check=True)
 
     return dest_path
 
@@ -89,8 +99,9 @@ def sync_to_game(schematic: Dict[str, Any], filename: Optional[str] = None) -> T
 
         # Ensure target directory exists and copy with game ownership
         copy_cmd = (
-            f"su -c 'mkdir -p \"{GAME_SCHEMATICS_DIR}\" && "
-            f"cp \"{tmp_path}\" \"{dest_path}\" && "
+            f"su -c 'chmod 755 /storage /storage/emulated 2>/dev/null || true && "
+            f"mkdir -p \"{GAME_SCHEMATICS_DIR}\" && "
+            f"cat \"{tmp_path}\" > \"{dest_path}\" && "
             f"chmod 664 \"{dest_path}\" && chown u0_a248:ext_data_rw \"{dest_path}\" 2>/dev/null || true && "
             f"rm -f \"{tmp_path}\"'"
         )
@@ -139,4 +150,8 @@ def list_game_schematics() -> List[str]:
         )
         if res.returncode == 0:
             files = [line.strip() for line in res.stdout.splitlines() if line.strip().endswith(".msch")]
-          
+            return files
+    except Exception:
+        pass
+
+    return []

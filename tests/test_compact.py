@@ -11,16 +11,19 @@ import subprocess
 
 # Ensure current and parent dirs are in sys.path
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CUR_DIR)
 if CUR_DIR not in sys.path:
     sys.path.insert(0, CUR_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
 
 try:
-    from compact import build_compact_defense, build_compact_factory
+    from compact import build_compact_defense, build_compact_factory, build_nested_artillery_module
     from validator import validate_schematic
     from sim import trace_supply
     from codec import encode_schematic, decode_schematic
 except ImportError:
-    from core.compact import build_compact_defense, build_compact_factory
+    from core.compact import build_compact_defense, build_compact_factory, build_nested_artillery_module
     from core.validator import validate_schematic
     from core.sim import trace_supply
     from core.codec import encode_schematic, decode_schematic
@@ -81,6 +84,53 @@ class TestCompactDefense(unittest.TestCase):
             self.assertIn("copper", supp, f"Salvo at {pos} missing copper")
             self.assertIn("water", supp, f"Salvo at {pos} missing water")
 
+    def test_nested_water_cooled_hail_module(self):
+        """Verify 7x7 nested water-cooled Hail module has 18 Hails, zero errors, zero missing demands, zero leaks, and 100% graphite & water supply."""
+        schem = build_nested_artillery_module("hail")
+        self.assertEqual(schem["width"], 7)
+        self.assertEqual(schem["height"], 7)
+
+        hails = [t for t in schem["tiles"] if t["block"] == "hail"]
+        self.assertEqual(len(hails), 18)
+
+        # Static validation
+        val_result = validate_schematic(schem, inlets=schem.get("inlets"))
+        self.assertTrue(val_result.is_valid, f"Validation errors: {val_result.errors}")
+        self.assertEqual(len(val_result.errors), 0)
+
+        # Supply tracing
+        report = trace_supply(schem, inlets=schem.get("inlets"))
+        self.assertEqual(len(report.leaks()), 0)
+        self.assertEqual(len(report.missing_demands(include_optional=True)), 0)
+
+        # Verify every hail has both graphite and water
+        for hail in hails:
+            pos = (hail["x"], hail["y"])
+            supp = report.supplied_resources.get(pos, set())
+            self.assertIn("graphite", supp, f"Hail at {pos} missing graphite")
+            self.assertIn("water", supp, f"Hail at {pos} missing water")
+
+        # Test CLI check command on nested module
+        _, b64_str = encode_schematic(schem)
+        msch_path = os.path.join(CUR_DIR, "msch")
+        if not os.path.exists(msch_path):
+            msch_path = os.path.join(os.path.dirname(CUR_DIR), "msch")
+
+        res = subprocess.run(
+            [sys.executable, msch_path, "check", b64_str],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0, f"CLI check failed: {res.stderr}\n{res.stdout}")
+        self.assertIn("[STATUS]: PASS", res.stdout)
+        for line_num, line in enumerate(res.stdout.splitlines(), start=1):
+            self.assertLessEqual(
+                len(line),
+                70,
+                f"Line {line_num} in 'msch check' exceeds 70 cols ({len(line)} cols): '{line}'"
+            )
+
     def test_cli_check_command(self):
         """Verify CLI check command validates schematics and formats terminal checklist correctly."""
         schem = build_compact_defense("duo", target_count=12, cooled=True)
@@ -103,4 +153,14 @@ class TestCompactDefense(unittest.TestCase):
         self.assertIn("Tier B", res.stdout)
         self.assertIn("Tier C", res.stdout)
 
-        # Assert strict <= 70 column width rule 
+        # Assert strict <= 70 column width rule on all output lines
+        for line_num, line in enumerate(res.stdout.splitlines(), start=1):
+            self.assertLessEqual(
+                len(line),
+                70,
+                f"Line {line_num} in 'msch check' exceeds 70 cols ({len(line)} cols): '{line}'"
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

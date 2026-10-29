@@ -262,6 +262,26 @@ def render_schematic_png(schematic: Dict[str, Any], cell_size: int = 28) -> byte
                 canvas.fill_rect(cx - 8, cy - 3, 8, 2, COLOR_DUO_BARREL)
                 canvas.fill_rect(cx - 8, cy + 1, 8, 2, COLOR_DUO_BARREL)
 
+        elif b_name == "hail":
+            canvas.draw_rect(bx, by, bw, bh, (45, 48, 55, 255), fill_color=(80, 85, 95, 255))
+            canvas.draw_circle(cx, cy, 6, (120, 125, 135, 255), fill=True)
+            canvas.draw_circle(cx, cy, 4, (40, 42, 48, 255), fill=True)
+            # Mortar / artillery barrel pointing in rot direction
+            if rot == 1:  # North
+                canvas.fill_rect(cx - 2, cy - 8, 4, 8, (160, 165, 175, 255))
+            elif rot == 0:  # East
+                canvas.fill_rect(cx, cy - 2, 8, 4, (160, 165, 175, 255))
+            elif rot == 3:  # South
+                canvas.fill_rect(cx - 2, cy, 4, 8, (160, 165, 175, 255))
+            elif rot == 2:  # West
+                canvas.fill_rect(cx - 8, cy - 2, 8, 4, (160, 165, 175, 255))
+
+        elif b_name == "liquid-router":
+            canvas.draw_rect(bx, by, bw, bh, (40, 70, 110, 255), fill_color=(50, 90, 150, 255))
+            canvas.fill_rect(cx - 2, by + 3, 4, bh - 6, (90, 160, 230, 255))
+            canvas.fill_rect(bx + 3, cy - 2, bw - 6, 4, (90, 160, 230, 255))
+            canvas.draw_circle(cx, cy, 4, (30, 60, 100, 255), fill=True)
+
         elif b_name == "router":
             canvas.draw_rect(bx, by, bw, bh, (60, 60, 70, 255), fill_color=COLOR_ROUTER)
             # Cross

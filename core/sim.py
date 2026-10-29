@@ -171,10 +171,14 @@ def _autodetect_inlets(schematic: Dict[str, Any]) -> List[Tuple[int, int, str]]:
     # Calculate internal incoming targets
     internal_incoming_targets: Set[Tuple[int, int]] = set()
     for t in tiles:
-        targets = get_output_targets(t, came_from=None, grid=cell_to_tile)
-        for tgt in targets:
-            if tgt in cell_to_tile:
-                internal_incoming_targets.add(tgt)
+        b_name = t.get("block", "")
+        phys = get_block_physics(b_name)
+        # Directed transport (conveyors, conduits), bridges, and producers create internal feeds
+        if phys.rotatable or "bridge" in b_name or phys.produces_items or phys.produces_liquids:
+            targets = get_output_targets(t, came_from=None, grid=cell_to_tile)
+            for tgt in targets:
+                if tgt in cell_to_tile:
+                    internal_incoming_targets.add(tgt)
 
     # Discover what resources consumers in this schematic need
     needed_items: Set[str] = set()
@@ -186,7 +190,14 @@ def _autodetect_inlets(schematic: Dict[str, Any]) -> List[Tuple[int, int, str]]:
         phys = get_block_physics(t.get("block", ""))
         needed_items.update(phys.solid_inputs)
         if phys.ammo_options:
-            needed_items.add("copper")  # Standard default ammo
+            if "copper" in phys.ammo_options:
+                needed_items.add("copper")
+            elif "graphite" in phys.ammo_options:
+                needed_items.add("graphite")
+            elif "coal" in phys.ammo_options:
+                needed_items.add("coal")
+            else:
+                needed_items.add(sorted(list(phys.ammo_options))[0])
         needed_liquids.update(phys.liquid_inputs)
         if phys.optional_liquids:
             needed_liquids.add("water")

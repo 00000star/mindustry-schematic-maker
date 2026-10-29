@@ -240,3 +240,84 @@ def build_compact_factory(
         raise ValueError(f"Generated factory failed validation: {'; '.join(validation.errors)}")
 
     return schem
+
+
+def build_nested_artillery_module(
+    turret_name: str = "hail",
+    width: int = 7,
+    height: int = 7,
+) -> Dict[str, Any]:
+    """
+    Generate an ultra-compact nested 7x7 water-cooled artillery module.
+    Features:
+      - 3 alternating columns of 6 turrets (18 turrets total)
+      - Col 0: router column (ammo)
+      - Col 1: turret column
+      - Col 2: liquid-router column (water coolant)
+      - Col 3: turret column
+      - Col 4: router column (ammo)
+      - Col 5: turret column
+      - Col 6: liquid-router column (water coolant)
+      - Row 0 Dual Underfloor Bridge Feeders:
+          (0, 0): router (solid ammo inlet)
+          (1, 0): bridge-conveyor transmitter jumping +3 to (4, 0)
+          (2, 0): liquid-router (water coolant inlet)
+          (3, 0): bridge-conduit transmitter jumping +3 to (6, 0)
+          (4, 0): bridge-conveyor receiver facing North into Col 4 router
+          (5, 0): power-node providing power
+          (6, 0): bridge-conduit receiver facing North into Col 6 liquid-router
+      - Declared Inlets:
+          (0, 0, 'graphite' if turret_name == 'hail' else 'copper')
+          (2, 0, 'water')
+          (5, 0, 'power')
+    """
+    cleaned = turret_name.strip().lower().replace(" ", "-")
+    phys = get_block_physics(cleaned)
+    if phys.size != 1:
+        raise ValueError(
+            f"Nested module currently only supports 1x1 turrets, got {cleaned} (size {phys.size})"
+        )
+
+    turret_title = cleaned.replace("-", " ").title()
+    title = f"Nested Water-Cooled {turret_title} Module (18x)"
+    desc = f"7x7 nested water-cooled {cleaned} fortification with dual underfloor bridge distribution."
+    builder = SchematicBuilder(name=title, description=desc)
+
+    # Row 0: Dual Underfloor Bridge Feeders
+    builder.add("router", 0, 0, rotation=0)
+    builder.add("bridge-conveyor", 1, 0, rotation=0, config=("point2", 3, 0))
+    builder.add("liquid-router", 2, 0, rotation=0)
+    builder.add("bridge-conduit", 3, 0, rotation=0, config=("point2", 3, 0))
+    builder.add("bridge-conveyor", 4, 0, rotation=1, config=("point2", -1, -1))
+    builder.add("power-node", 5, 0, rotation=0)
+    builder.add("bridge-conduit", 6, 0, rotation=1, config=("point2", -1, -1))
+
+    # Rows 1 to 6 (y=1..6):
+    for y in range(1, height):
+        builder.add("router", 0, y, rotation=0)
+        builder.add(cleaned, 1, y, rotation=0)
+        builder.add("liquid-router", 2, y, rotation=0)
+        builder.add(cleaned, 3, y, rotation=0)
+        builder.add("router", 4, y, rotation=0)
+        builder.add(cleaned, 5, y, rotation=0)
+        builder.add("liquid-router", 6, y, rotation=0)
+
+    # Declared Inlets
+    ammo_item = "graphite" if cleaned == "hail" else "copper"
+    builder.inlet(0, 0, ammo_item)
+    builder.inlet(2, 0, "water")
+    builder.inlet(5, 0, "power")
+
+    schem = builder.build()
+    validation = validate_schematic(schem, inlets=builder.inlets)
+    if not validation.is_valid:
+        raise ValueError(f"Generated nested module failed validation: {'; '.join(validation.errors)}")
+
+    report = trace_supply(schem, inlets=builder.inlets)
+    missing = report.missing_demands()
+    if missing:
+        missing_desc = [f"{m['block']} at ({m['x']},{m['y']}) missing {m['missing']}" for m in missing]
+        raise ValueError(f"Generated nested module has unsupplied consumers: {'; '.join(missing_desc)}")
+
+    return schem
+

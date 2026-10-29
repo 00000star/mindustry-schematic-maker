@@ -553,8 +553,20 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
         count = max(1, min(int(match.group(1)), 32))
 
     # Match prompt intents
+    # 0. Nested Water-Cooled Artillery Module
+    if "nested" in text or (("water" in text or "cool" in text) and "hail" in text) or ("artillery" in text and ("nested" in text or "module" in text)):
+        try:
+            from .compact import build_nested_artillery_module
+        except ImportError:
+            try:
+                from core.compact import build_nested_artillery_module
+            except ImportError:
+                from compact import build_nested_artillery_module
+        turret = "duo" if "duo" in text else "hail"
+        return build_nested_artillery_module(turret)
+
     # 1. Community Overdrive Fortress
-    if "community" in text or ("overdrive" in text and "duo" in text) or ("duos with walls" in text):
+    elif "community" in text or ("overdrive" in text and "duo" in text) or ("duos with walls" in text):
         return generate_community_duo_fortress()
 
     # 2. Water-Cooled Salvo Defense
@@ -624,9 +636,9 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
     elif ("water" in text or "cooled" in text or "coolant" in text) and "duo" in text:
         return generate_water_cooled_duo_fortress(width=8)
 
-    elif "defense" in text or "wall" in text or "turret" in text or "salvo" in text or "duo" in text or "scatter" in text or "lancer" in text:
+    elif "defense" in text or "wall" in text or "turret" in text or "salvo" in text or "duo" in text or "scatter" in text or "lancer" in text or "hail" in text:
         turret = "salvo"
-        for candidate in ["duo", "scatter", "lancer", "salvo", "fuse", "cyclone", "ripple"]:
+        for candidate in ["duo", "scatter", "lancer", "salvo", "fuse", "cyclone", "ripple", "hail"]:
             if candidate in text:
                 turret = candidate
                 break
