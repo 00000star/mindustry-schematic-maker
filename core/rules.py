@@ -433,11 +433,32 @@ def get_output_targets(
         dy = ty - fy
         return [(tx + dx, ty + dy)]
 
-    # 3. Routers & Liquid Routers: distribute to all orthogonal neighbors except came_from
+    # 3. Routers & Liquid Routers: distribute to orthogonal neighbors except came_from
     if b_name in ("router", "liquid-router"):
         neighbors = [(tx + 1, ty), (tx - 1, ty), (tx, ty + 1), (tx, ty - 1)]
         if came_from is not None:
-            neighbors = [n for n in neighbors if n != came_from]
+            came_from_tile = cell_map.get(came_from) if cell_map else None
+            if came_from_tile is not None:
+                neighbors = [n for n in neighbors if cell_map.get(n) is not came_from_tile]
+            else:
+                neighbors = [n for n in neighbors if n != came_from]
+        if cell_map:
+            res_kind = "liquid" if b_name == "liquid-router" else "item"
+            valid_neighbors = []
+            for n in neighbors:
+                if n in cell_map:
+                    n_tile = cell_map[n]
+                    if not can_accept(n_tile.get("block", ""), res_kind):
+                        continue
+                    # If neighbor is a conveyor/conduit pointing into this router, it cannot accept reverse flow
+                    n_phys = get_block_physics(n_tile.get("block", ""))
+                    if n_phys.rotatable and n_phys.transport_type in ("item", "liquid"):
+                        n_rot = int(n_tile.get("rotation", 0)) % 4
+                        n_dx, n_dy = ROTATION_VECTORS[n_rot]
+                        if (n[0] + n_dx, n[1] + n_dy) == (tx, ty):
+                            continue
+                valid_neighbors.append(n)
+            neighbors = valid_neighbors
         return neighbors
 
     # 4. Distributors (2x2 Router)
@@ -449,7 +470,13 @@ def get_output_targets(
             (tx, ty + 2), (tx + 1, ty + 2),
         ]
         if came_from is not None:
-            perimeter = [p for p in perimeter if p != came_from]
+            came_from_tile = cell_map.get(came_from) if cell_map else None
+            if came_from_tile is not None:
+                perimeter = [p for p in perimeter if cell_map.get(p) is not came_from_tile]
+            else:
+                perimeter = [p for p in perimeter if p != came_from]
+        if cell_map:
+            perimeter = [p for p in perimeter if p not in cell_map or can_accept(cell_map[p].get("block", ""), "item")]
         return perimeter
 
     # 5. Overflow Gate: straight ahead first; if blocked or off-grid, sideways
@@ -505,6 +532,9 @@ def get_output_targets(
             neighbors = [(tx + 1, ty), (tx - 1, ty), (tx, ty + 1), (tx, ty - 1)]
             if came_from is not None:
                 neighbors = [n for n in neighbors if n != came_from]
+            if cell_map:
+                res_kind = "liquid" if b_name == "bridge-conduit" else "item"
+                neighbors = [n for n in neighbors if n not in cell_map or can_accept(cell_map[n].get("block", ""), res_kind)]
             return neighbors
         else:
             # Transmitter bridge links directly to target receiver
@@ -515,18 +545,42 @@ def get_output_targets(
         dx, dy = ROTATION_VECTORS[rot]
         return [(tx + dx, ty + dy)]
 
-    # Default fallback: for non-transport or multi-tile factories producing items,
-    # outputs can leave perimeter cells.
+    # Default fallback: for multi-tile factories producing items/liquids,
+    # outputs can leave perimeter cells that do not point into the factory.
     if phys.produces_items or phys.produces_liquids:
-        perimeter = []
+        factory_cells = {(tx + dx, ty + dy) for dx in range(phys.size) for dy in range(phys.size)}
+        candidates = []
         for ox in range(phys.size):
-            perimeter.append((tx + ox, ty - 1))
-            perimeter.append((tx + ox, ty + phys.size))
+            candidates.append((tx + ox, ty - 1))
+            candidates.append((tx + ox, ty + phys.size))
         for oy in range(phys.size):
-            perimeter.append((tx - 1, ty + oy))
-            perimeter.append((tx + phys.size, ty + oy))
+            candidates.append((tx - 1, ty + oy))
+            candidates.append((tx + phys.size, ty + oy))
+
         if came_from is not None:
-            perimeter = [p for p in perimeter if p != came_from]
+            came_from_tile = cell_map.get(came_from) if cell_map else None
+            if came_from_tile is not None:
+                candidates = [p for p in candidates if cell_map.get(p) is not came_from_tile]
+            else:
+                candidates = [p for p in candidates if p != came_from]
+
+        perimeter = []
+        for cx, cy in candidates:
+            if cell_map:
+                neighbor_tile = cell_map.get((cx, cy))
+                if neighbor_tile:
+                    n_bname = neighbor_tile.get("block", "")
+                    n_phys = get_block_physics(n_bname)
+                    if n_phys.rotatable and n_phys.transport_type in ("item", "liquid"):
+                        n_rot = neighbor_tile.get("rotation", 0) % 4
+                        n_dx, n_dy = ROTATION_VECTORS[n_rot]
+                        if (cx + n_dx, cy + n_dy) in factory_cells:
+                            # Neighbor conveyor points directly into factory; cannot emit against flow!
+                            continue
+                    # Production blocks output to conveyors or downstream consumers, not into distribution routers
+                    if n_bname in ("router", "junction", "distributor", "liquid-router", "liquid-junction"):
+                        continue
+            perimeter.append((cx, cy))
         return perimeter
 
     return []

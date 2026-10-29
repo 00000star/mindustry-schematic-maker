@@ -12,11 +12,17 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from .blocks import get_block
+    from .rules import get_block_physics
+    from .sim import trace_supply
 except ImportError:
     try:
         from core.blocks import get_block
+        from core.rules import get_block_physics
+        from core.sim import trace_supply
     except ImportError:
         from blocks import get_block
+        from rules import get_block_physics
+        from sim import trace_supply
 
 
 # Palette Definitions (RGBA)
@@ -122,6 +128,15 @@ class Canvas:
                     d2 = (x - cx) ** 2 + (y - cy) ** 2
                     if inner_r2 <= d2 <= r2:
                         self.set_pixel(x, y, r, g, b, a)
+
+    def draw_diamond(self, cx: int, cy: int, radius: int, color):
+        """Draw a filled diamond shape centered at (cx, cy)."""
+        r, g, b = color[:3]
+        a = color[3] if len(color) > 3 else 255
+        for dy in range(-radius, radius + 1):
+            span = radius - abs(dy)
+            for dx in range(-span, span + 1):
+                self.set_pixel(cx + dx, cy + dy, r, g, b, a)
 
     def draw_line(self, x0: int, y0: int, x1: int, y1: int, color, dotted: bool = False):
         """Bresenham's line algorithm with support for dotted patterns and 2px stroke."""
@@ -343,5 +358,48 @@ def render_schematic_png(schematic: Dict[str, Any], cell_size: int = 28) -> byte
                     canvas.draw_line(src_cx, src_cy, dst_cx, dst_cy, line_color, dotted=True)
                     # Destination target ring
                     canvas.draw_circle(dst_cx, dst_cy, 4, line_color, fill=False)
+
+    # 4. Render Visual Supply Overlays (Ammo, Coolant & Consumer Health Indicators)
+    try:
+        supply_report = trace_supply(schematic)
+        missing_set = {(m["x"], m["y"]) for m in supply_report.missing_demands(include_optional=True)}
+
+        for t in tiles:
+            b_name = t["block"]
+            phys = get_block_physics(b_name)
+            ox, oy = t.get("x", 0), t.get("y", 0)
+            size = phys.size
+            px, py = tile_to_pixel(ox, oy, size)
+            bw, bh = size * cell_size, size * cell_size
+            supplied = supply_report.supplied_resources.get((ox, oy), set())
+
+            # Indicator A: Orange diamond indicator on blocks receiving ammo
+            has_ammo = bool(supplied.intersection(phys.ammo_options) or "ammo" in supplied or "copper" in supplied or "lead" in supplied or "coal" in supplied)
+            if has_ammo:
+                diamond_x = px + 6
+                diamond_y = py + 6
+                canvas.draw_diamond(diamond_x, diamond_y, radius=3, color=(230, 126, 34, 255))
+
+            # Indicator B: Blue droplet indicator on blocks receiving water
+            has_water = bool("water" in supplied or "cryofluid" in supplied or "liquid" in supplied)
+            if has_water:
+                droplet_x = px + 6
+                droplet_y = py + bh - 6
+                canvas.draw_circle(droplet_x, droplet_y, radius=3, color=(52, 152, 219, 255), fill=True)
+
+            # Indicator C: Consumer health status
+            if phys.is_consumer:
+                cx_dot = px + bw - 6
+                cy_dot = py + 6
+                if (ox, oy) in missing_set:
+                    # Red warning dot/border on consumers missing ammo or coolant
+                    canvas.draw_circle(cx_dot, cy_dot, radius=3, color=(231, 76, 60, 255), fill=True)
+                    canvas.draw_rect(px, py, bw, bh, border_color=(231, 76, 60, 160))
+                else:
+                    # Green dot/halo on consumers that are 100% fully supplied
+                    canvas.draw_circle(cx_dot, cy_dot, radius=3, color=(46, 204, 113, 255), fill=True)
+                    canvas.draw_circle(cx_dot, cy_dot, radius=5, color=(46, 204, 113, 90), fill=False)
+    except Exception:
+        pass
 
     return canvas.to_png_bytes()

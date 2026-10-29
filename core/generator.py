@@ -553,7 +553,46 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
         count = max(1, min(int(match.group(1)), 32))
 
     # Match prompt intents
-    if "duo" in text and ("fortress" in text or "overdrive" in text or "defense" in text or "community" in text or "water" in text):
+    # 1. Community Overdrive Fortress
+    if "community" in text or ("overdrive" in text and "duo" in text) or ("duos with walls" in text):
+        return generate_community_duo_fortress()
+
+    # 2. Water-Cooled Salvo Defense
+    elif "salvo" in text and ("water" in text or "cool" in text):
+        try:
+            from .compact import build_compact_defense
+        except ImportError:
+            try:
+                from core.compact import build_compact_defense
+            except ImportError:
+                from compact import build_compact_defense
+        return build_compact_defense("salvo", target_count=count if count > 2 else 4, cooled=True)
+
+    # 3. Water-Cooled Duo Defense
+    elif "duo" in text and ("water" in text or "cool" in text):
+        try:
+            from .compact import build_compact_defense
+        except ImportError:
+            try:
+                from core.compact import build_compact_defense
+            except ImportError:
+                from compact import build_compact_defense
+        return build_compact_defense("duo", target_count=count if count > 4 else 12, cooled=True)
+
+    # 4. Compact Defense General
+    elif "compact" in text and ("defense" in text or "turret" in text or "duo" in text or "salvo" in text):
+        try:
+            from .compact import build_compact_defense
+        except ImportError:
+            try:
+                from core.compact import build_compact_defense
+            except ImportError:
+                from compact import build_compact_defense
+        turret = "salvo" if "salvo" in text else "duo"
+        is_cooled = "water" in text or "cool" in text
+        return build_compact_defense(turret, target_count=count, cooled=is_cooled)
+
+    elif "duo" in text and ("fortress" in text or "defense" in text):
         return generate_community_duo_fortress()
 
     elif "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:

@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Mindustry Schematic Maker (msch) CLI.
 Pure Python Mindustry v7 schematic generator, decoder, renderer, and game sync utility.
@@ -20,12 +20,14 @@ try:
     from core.renderer import render_schematic_ascii
     from core.visual_renderer import render_schematic_png
     from core.generator import compile_from_prompt
+    from core.validator import validate_schematic, ValidationResult
     from core.sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
 except ImportError:
     from codec import encode_schematic, decode_schematic
     from renderer import render_schematic_ascii
     from visual_renderer import render_schematic_png
     from generator import compile_from_prompt
+    from validator import validate_schematic, ValidationResult
     from sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
 
 
@@ -37,6 +39,15 @@ def cmd_make(args):
 
     print(f"Generating schematic from: '{prompt}'...")
     schematic = compile_from_prompt(prompt)
+
+    # Static Validation Gate before saving
+    validation = validate_schematic(schematic)
+    if not validation.is_valid:
+        print(f"\n[!] Static Validation FAILED ({len(validation.errors)} errors):")
+        for err in validation.errors:
+            print(f"  [X] {err}")
+        print("\nAborting save due to validation failure.")
+        sys.exit(1)
 
     # Render preview
     print("\n" + render_schematic_ascii(schematic))
@@ -121,6 +132,63 @@ def cmd_list(args):
             print(f"  • {f}")
 
 
+def cmd_check(args):
+    target = args.target
+    schematic = None
+    try:
+        if os.path.exists(target) or target.startswith("bXNja") or len(target) > 50:
+            schematic = decode_schematic(target)
+        else:
+            project_file = os.path.join(SCRIPT_DIR, "schematics", target)
+            if not project_file.endswith(".msch"):
+                project_file += ".msch"
+            if os.path.exists(project_file):
+                schematic = decode_schematic(project_file)
+            else:
+                schematic = compile_from_prompt(target)
+    except Exception:
+        try:
+            schematic = compile_from_prompt(target)
+        except Exception as e:
+            print(f"Error parsing check target: {e}")
+            sys.exit(1)
+
+    result = validate_schematic(schematic, strict=getattr(args, "strict", False))
+
+    print("+==================================================================+")
+    print("| Mindustry Schematic Static Validator                             |")
+    t_name = str(schematic.get("name", "Unknown"))[:40]
+    print(f"| Target: {t_name:<56} |")
+    dim_str = f"{schematic.get('width', 0)}x{schematic.get('height', 0)}"
+    tiles_str = str(len(schematic.get('tiles', [])))
+    print(f"| Dimensions: {dim_str:<10} | Total Tiles: {tiles_str:<29} |")
+    print("+==================================================================+")
+
+    if result.is_valid:
+        print("\n[STATUS]: PASS (100% Valid)")
+    else:
+        print(f"\n[STATUS]: FAIL ({len(result.errors)} errors)")
+
+    if result.errors:
+        print("\nErrors:")
+        for err in result.errors:
+            print(f"  [X] {err}")
+
+    if result.warnings:
+        print("\nWarnings:")
+        for warn in result.warnings:
+            print(f"  [!] {warn}")
+
+    if not result.errors and not result.warnings:
+        print("\nChecklist Summary:")
+        print("  ✓ Tier A (Geometry & Multi-Tile Footprints): PASS")
+        print("  ✓ Tier B (Link Integrity & Orthogonality) : PASS")
+        print("  ✓ Tier C (Supply Demands & Liquid Purity)  : PASS")
+
+    if not result.is_valid:
+        sys.exit(1)
+
+
 def cmd_sync(args):
     target = args.target
     # Check if target is a file in project folder
@@ -169,6 +237,11 @@ def main():
     p_list = subparsers.add_parser("list", help="List schematics")
     p_list.add_argument("--game", action="store_true", help="List schematics in game folder")
 
+    # check
+    p_check = subparsers.add_parser("check", help="Statically check and validate schematic")
+    p_check.add_argument("target", help="File path, Base64 string, or prompt")
+    p_check.add_argument("--strict", action="store_true", help="Enable strict validation")
+
     # sync
     p_sync = subparsers.add_parser("sync", help="Sync schematic to game folder")
     p_sync.add_argument("target", help="File path, schematic name, or base64")
@@ -187,6 +260,8 @@ def main():
         cmd_decode(args)
     elif args.command == "list":
         cmd_list(args)
+    elif args.command == "check":
+        cmd_check(args)
     elif args.command == "sync":
         cmd_sync(args)
     else:

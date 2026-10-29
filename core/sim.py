@@ -396,11 +396,22 @@ def trace_supply(
 
             if can_produce:
                 for prod_item in phys.produces_items:
-                    # Emit to perimeter cells
                     for px, py in get_output_targets(t, came_from=None, grid=cell_to_tile):
+                        target_t = cell_to_tile.get((px, py))
+                        if target_t:
+                            tgt_origin = (target_t.get("x", 0), target_t.get("y", 0))
+                            tgt_supplied = report.supplied_resources.get(tgt_origin, set())
+                            if phys.solid_inputs.intersection(tgt_supplied):
+                                continue
                         current_injections.append((px, py, (ox, oy), prod_item))
                 for prod_liq in phys.produces_liquids:
                     for px, py in get_output_targets(t, came_from=None, grid=cell_to_tile):
+                        target_t = cell_to_tile.get((px, py))
+                        if target_t:
+                            tgt_origin = (target_t.get("x", 0), target_t.get("y", 0))
+                            tgt_supplied = report.supplied_resources.get(tgt_origin, set())
+                            if phys.liquid_inputs.intersection(tgt_supplied):
+                                continue
                         current_injections.append((px, py, (ox, oy), prod_liq))
 
         # BFS Queue: (curr_x, curr_y, came_from, resource_name)
