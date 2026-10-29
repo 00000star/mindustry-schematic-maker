@@ -91,7 +91,7 @@ def sync_to_game(schematic: Dict[str, Any], filename: Optional[str] = None) -> T
         copy_cmd = (
             f"su -c 'mkdir -p \"{GAME_SCHEMATICS_DIR}\" && "
             f"cp \"{tmp_path}\" \"{dest_path}\" && "
-            f"chmod 660 \"{dest_path}\" && "
+            f"chmod 664 \"{dest_path}\" && chown u0_a248:ext_data_rw \"{dest_path}\" 2>/dev/null || true && "
             f"rm -f \"{tmp_path}\"'"
         )
         res = subprocess.run(
@@ -139,8 +139,4 @@ def list_game_schematics() -> List[str]:
         )
         if res.returncode == 0:
             files = [line.strip() for line in res.stdout.splitlines() if line.strip().endswith(".msch")]
-            return files
-    except Exception:
-        pass
-
-    return []
+          
