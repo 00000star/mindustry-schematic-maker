@@ -172,6 +172,7 @@ BLOCKS: Dict[str, BlockInfo] = {
     "memory-bank": BlockInfo("memory-bank", 2, "logic", False, "M"),
     "logic-display": BlockInfo("logic-display", 3, "logic", False, "D"),
     "large-logic-display": BlockInfo("large-logic-display", 6, "logic", False, "D"),
+    "metaglass-kiln": BlockInfo("kiln", 2, "production", False, "k"),
 }
 
 
@@ -181,6 +182,8 @@ def get_block(name: str) -> BlockInfo:
     Falls back to a default 1x1 non-rotatable block if unknown.
     """
     cleaned = name.strip().lower().replace(" ", "-")
+    if cleaned == "metaglass-kiln":
+        cleaned = "kiln"
     if cleaned in BLOCKS:
         return BLOCKS[cleaned]
     return BlockInfo(cleaned, 1, "unknown", False, "?")

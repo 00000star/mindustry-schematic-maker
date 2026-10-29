@@ -591,59 +591,56 @@ def compile_from_prompt(prompt: str) -> Dict[str, Any]:
                 from compact import build_compact_defense
         return build_compact_defense("duo", target_count=count if count > 4 else 12, cooled=True)
 
-    # 4. Compact Defense General
-    elif "compact" in text and ("defense" in text or "turret" in text or "duo" in text or "salvo" in text):
+    # 4. Compact Defense & Universal Synthesizers
+    elif "compact" in text and ("defense" in text or "turret" in text or any(k in text for k in ["duo", "salvo", "fuse", "cyclone", "ripple", "spectre"])):
         try:
-            from .compact import build_compact_defense
+            from .compact import synthesize_compact_defense
         except ImportError:
             try:
-                from core.compact import build_compact_defense
+                from core.compact import synthesize_compact_defense
             except ImportError:
-                from compact import build_compact_defense
-        turret = "salvo" if "salvo" in text else "duo"
-        is_cooled = "water" in text or "cool" in text
-        return build_compact_defense(turret, target_count=count, cooled=is_cooled)
-
-    elif "duo" in text and ("fortress" in text or "defense" in text):
-        return generate_community_duo_fortress()
-
-    elif "scorch" in text or "scrotch" in text or "killbox" in text or "choke" in text:
-        return generate_scorch_bunker(count=count)
-
-    elif "silicon" in text or "smelter" in text:
-        return generate_silicon_factory(smelters=count)
-
-    elif "graphite" in text or "press" in text:
-        return generate_graphite_press(presses=count)
-
-    elif "metaglass" in text or "kiln" in text:
-        return generate_metaglass_kiln(kilns=count)
-
-    elif "cryo" in text or "cryofluid" in text:
-        mixers = max(1, count // 2 if count > 2 else count)
-        return generate_cryofluid_mixer(mixers=mixers)
-
-    elif "thorium" in text or "reactor" in text or "nuclear" in text or "nuke" in text:
-        reactors = max(1, count if count <= 4 else count // 2)
-        with_logic = "no logic" not in text and "without logic" not in text
-        return generate_thorium_reactor_bank(reactors=reactors, with_logic=with_logic)
-
-    elif "solar" in text or "battery" in text or "power" in text:
-        cols = max(2, min(count, 5))
-        rows = 2
-        return generate_solar_battery_array(rows=rows, cols=cols)
-
-    elif ("water" in text or "cooled" in text or "coolant" in text) and "duo" in text:
-        return generate_water_cooled_duo_fortress(width=8)
-
-    elif "defense" in text or "wall" in text or "turret" in text or "salvo" in text or "duo" in text or "scatter" in text or "lancer" in text or "hail" in text:
+                from compact import synthesize_compact_defense
         turret = "salvo"
-        for candidate in ["duo", "scatter", "lancer", "salvo", "fuse", "cyclone", "ripple", "hail"]:
+        for candidate in ["cyclone", "fuse", "ripple", "spectre", "salvo", "duo", "hail", "scorch", "lancer", "wave"]:
             if candidate in text:
                 turret = candidate
                 break
-        return generate_defense_line(turret=turret, count=count)
+        is_cooled = "water" in text or "cool" in text
+        return synthesize_compact_defense(turret, target_count=count, cooled=is_cooled)
 
-    else:
-        # Default fallback: silicon factory
-        return generate_silicon_factory(smelters=count)
+    elif ("compact" in text or "synthesize" in text) and any(k in text for k in ["silicon", "metaglass", "kiln", "phase", "plastanium", "cryo", "graphite"]):
+        try:
+            from .compact import synthesize_factory
+        except ImportError:
+            try:
+                from core.compact import synthesize_factory
+            except ImportError:
+                from compact import synthesize_factory
+        recipe = "silicon-smelter"
+        for candidate in ["silicon", "metaglass", "kiln", "phase", "plastanium", "cryofluid", "cryo", "graphite"]:
+            if candidate in text:
+                recipe = candidate
+                break
+        return synthesize_factory(recipe, count=count)
+
+    elif ("compact" in text or "synthesize" in text) and any(k in text for k in ["thorium", "nuclear", "steam"]):
+        try:
+            from .compact import synthesize_power_plant
+        except ImportError:
+            try:
+                from core.compact import synthesize_power_plant
+            except ImportError:
+                from compact import synthesize_power_plant
+        tech = "thorium-reactor" if ("thorium" in text or "nuclear" in text) else "steam-generator"
+        return synthesize_power_plant(tech, count=count)
+
+    elif "phase" in text and ("weaver" in text or "factory" in text):
+        try:
+            from .compact import synthesize_factory
+        except ImportError:
+            from core.compact import synthesize_factory
+        return synthesize_factory("phase-weaver", count=count)
+
+    elif "plastanium" in text and ("compressor" in text or "factory" in text):
+        try:
+            from .compact import synthesize_

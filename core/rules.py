@@ -202,6 +202,10 @@ RULES_TABLE: Dict[str, BlockPhysics] = {
         name="combustion-generator", size=2, category="power", transport_type="power",
         solid_inputs=["coal"], produces_power=True
     ),
+    "steam-generator": BlockPhysics(
+        name="steam-generator", size=2, category="power", transport_type="power",
+        solid_inputs=["coal"], liquid_inputs=["water"], produces_power=True
+    ),
 
     # --------------------------------------------------------------------------
     # Consumers: Turrets
@@ -247,6 +251,30 @@ RULES_TABLE: Dict[str, BlockPhysics] = {
         liquid_ammo_options=["water", "slag", "oil", "cryofluid"],
         rotatable=True
     ),
+    "ripple": BlockPhysics(
+        name="ripple", size=3, category="turret",
+        ammo_options=["graphite", "silicon", "pyratite", "blast-compound", "plastanium"],
+        optional_liquids=["water", "cryofluid"],
+        rotatable=True
+    ),
+    "fuse": BlockPhysics(
+        name="fuse", size=3, category="turret",
+        ammo_options=["titanium", "thorium"],
+        optional_liquids=["water", "cryofluid"],
+        rotatable=True
+    ),
+    "cyclone": BlockPhysics(
+        name="cyclone", size=3, category="turret",
+        ammo_options=["blast-compound", "surge-alloy", "plastanium"],
+        optional_liquids=["water", "cryofluid"],
+        rotatable=True
+    ),
+    "spectre": BlockPhysics(
+        name="spectre", size=4, category="turret",
+        ammo_options=["graphite", "pyratite", "thorium"],
+        optional_liquids=["water", "cryofluid"],
+        rotatable=True
+    ),
 
     # --------------------------------------------------------------------------
     # Consumers: Defense & Support
@@ -286,6 +314,16 @@ RULES_TABLE: Dict[str, BlockPhysics] = {
         solid_inputs=["sand", "lead"], requires_power=True,
         produces_items=["metaglass"]
     ),
+    "plastanium-compressor": BlockPhysics(
+        name="plastanium-compressor", size=2, category="production",
+        solid_inputs=["titanium"], liquid_inputs=["oil"], requires_power=True,
+        produces_items=["plastanium"]
+    ),
+    "phase-weaver": BlockPhysics(
+        name="phase-weaver", size=2, category="production",
+        solid_inputs=["thorium", "sand"], requires_power=True,
+        produces_items=["phase-fabric"]
+    ),
     "cryofluid-mixer": BlockPhysics(
         name="cryofluid-mixer", size=2, category="production",
         solid_inputs=["titanium"], liquid_inputs=["water"], requires_power=True,
@@ -313,9 +351,19 @@ RULES_TABLE: Dict[str, BlockPhysics] = {
 def get_block_physics(name: str) -> BlockPhysics:
     """Retrieve block physics definition, defaulting to inert 1x1 block if unrecognized."""
     cleaned = name.strip().lower().replace(" ", "-")
+    if cleaned == "metaglass-kiln":
+        cleaned = "kiln"
     if cleaned in RULES_TABLE:
         return RULES_TABLE[cleaned]
-    return BlockPhysics(cleaned, 1, "unknown")
+    try:
+        from .blocks import get_block
+    except ImportError:
+        try:
+            from core.blocks import get_block
+        except ImportError:
+            from blocks import get_block
+    cat_b = get_block(cleaned)
+    return BlockPhysics(cleaned, cat_b.size, cat_b.category)
 
 
 def can_accept(block_name: str, resource_type: str) -> bool:

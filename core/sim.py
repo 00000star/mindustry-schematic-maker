@@ -410,6 +410,8 @@ def trace_supply(
                     for px, py in get_output_targets(t, came_from=None, grid=cell_to_tile):
                         target_t = cell_to_tile.get((px, py))
                         if target_t:
+                            if not can_accept(target_t.get("block", ""), prod_item):
+                                continue
                             tgt_origin = (target_t.get("x", 0), target_t.get("y", 0))
                             tgt_supplied = report.supplied_resources.get(tgt_origin, set())
                             if phys.solid_inputs.intersection(tgt_supplied):
@@ -419,6 +421,8 @@ def trace_supply(
                     for px, py in get_output_targets(t, came_from=None, grid=cell_to_tile):
                         target_t = cell_to_tile.get((px, py))
                         if target_t:
+                            if not can_accept(target_t.get("block", ""), prod_liq):
+                                continue
                             tgt_origin = (target_t.get("x", 0), target_t.get("y", 0))
                             tgt_supplied = report.supplied_resources.get(tgt_origin, set())
                             if phys.liquid_inputs.intersection(tgt_supplied):
@@ -428,6 +432,7 @@ def trace_supply(
         # BFS Queue: (curr_x, curr_y, came_from, resource_name)
         queue = deque(current_injections)
         visited: Set[Tuple[int, int, Optional[Tuple[int, int]], str]] = set()
+        edge_cache: Dict[Tuple[int, int, Optional[Tuple[int, int]]], List[Tuple[int, int]]] = {}
 
         while queue:
             cx, cy, came_from, res = queue.popleft()
@@ -470,7 +475,12 @@ def trace_supply(
             is_liquid_transport = (phys.transport_type == "liquid" and (res in ALL_LIQUIDS or res == "liquid"))
 
             if is_item_transport or is_liquid_transport:
-                targets = get_output_targets(tile, came_from=came_from, grid=cell_to_tile)
+                edge_key = (ox, oy, came_from)
+                if edge_key in edge_cache:
+                    targets = edge_cache[edge_key]
+                else:
+                    targets = get_output_targets(tile, came_from=came_from, grid=cell_to_tile)
+                    edge_cache[edge_key] = targets
                 for tx, ty in targets:
                     queue.append((tx, ty, (cx, cy), res))
 
