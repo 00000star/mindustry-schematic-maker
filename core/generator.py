@@ -27,9 +27,15 @@ class SchematicBuilder:
             "description": description,
         }
         self.tiles: List[Dict[str, Any]] = []
+        self.inlets: List[Any] = []
 
     def set_tag(self, key: str, value: str) -> "SchematicBuilder":
         self.tags[key] = str(value)
+        return self
+
+    def inlet(self, x: int, y: int, resource: str) -> "SchematicBuilder":
+        """Tag a declared input port tile for supply simulation and validation."""
+        self.inlets.append((int(x), int(y), str(resource)))
         return self
 
     def add(
@@ -113,7 +119,24 @@ class SchematicBuilder:
             "height": max_y - min_y,
             "tags": self.tags,
             "tiles": list(self.tiles),
+            "inlets": list(self.inlets),
         }
+
+    def build_checked(self, strict: bool = False) -> Dict[str, Any]:
+        """Compile and statically validate schematic. Raises ValueError if invalid."""
+        schem = self.build()
+        try:
+            from .validator import validate_schematic
+        except ImportError:
+            try:
+                from core.validator import validate_schematic
+            except ImportError:
+                from validator import validate_schematic
+
+        result = validate_schematic(schem, inlets=self.inlets, strict=strict)
+        if not result.is_valid:
+            raise ValueError(f"Schematic validation failed: {'; '.join(result.errors)}")
+        return schem
 
 
 # ==============================================================================
