@@ -103,6 +103,4 @@ class TestCompactDefense(unittest.TestCase):
         self.assertIn("Tier B", res.stdout)
         self.assertIn("Tier C", res.stdout)
 
-
-if __name__ == "__main__":
-    unittest.main()
+        # Assert strict <= 70 column width rule 

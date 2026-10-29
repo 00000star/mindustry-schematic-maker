@@ -161,7 +161,7 @@ def cmd_check(args):
     print(f"| Target: {t_name:<56} |")
     dim_str = f"{schematic.get('width', 0)}x{schematic.get('height', 0)}"
     tiles_str = str(len(schematic.get('tiles', [])))
-    print(f"| Dimensions: {dim_str:<10} | Total Tiles: {tiles_str:<29} |")
+    print(f"| Dimensions: {dim_str:<10} | Total Tiles: {tiles_str:<26} |")
     print("+==================================================================+")
 
     if result.is_valid:
