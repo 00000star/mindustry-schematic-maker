@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-22%2F22%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-35%2F35%20passing-brightgreen.svg)](tests/)
 [![Mindustry](https://img.shields.io/badge/Mindustry-v7%20Build%20146-orange.svg)](https://mindustrygame.github.io/)
 
 Automated, closed-loop schematic generation, 3-tier static validation, and pure-Python supply simulation engine for **Mindustry v7 Serpulo**. **Zero external dependencies.**
@@ -27,6 +27,8 @@ Optimized specifically for mobile displays and terminal environments (strict `<=
   Native RGBA rasterizer exporting high-res schematic diagrams with block chassis, rotatable barrels, gold bridge links, and glowing green supply halos.
 - **Mobile-First CLI & Android Game Sync**:
   Outputs formatted strictly under 70 columns. Directly writes `.msch` files to Mindustry's Scoped Storage directory with root fallback.
+- **Native Mindustry Tool API v4 Integration**:
+  Discord OAuth authentication and direct publishing to the global community registry on mindustry-tool.com.
 
 ---
 
@@ -113,6 +115,38 @@ msch list
 
 # List installed schematics in Mindustry game folder
 msch list --game
+```
+
+### 6. Discord Authentication (`msch login`)
+
+Authenticate with [mindustry-tool.com](https://mindustry-tool.com) using Discord OAuth:
+
+```bash
+# Interactive Discord OAuth login flow
+msch login
+
+# Check authentication status and expiration
+msch login --status
+
+# Log out and clear stored session tokens
+msch login --logout
+```
+
+Session credentials are saved to `~/.config/mindustry/tool-auth.json` with strict `0600` permissions.
+
+### 7. Online Publishing (`msch publish`)
+
+Publish validated schematics directly to the global community registry on [mindustry-tool.com](https://mindustry-tool.com):
+
+```bash
+# Publish a local schematic file
+msch publish "schematics/Synthesized Silicon Smelter Factory (4x).msch"
+
+# Publish with custom title, tags, and description
+msch publish "schematics/Compact Cyclone Defense (4x).msch" \
+  --name "Compact Water-Cooled Cyclone" \
+  --tags "defense,cyclone,water,compact" \
+  --desc "Ultra-compact 4-cyclone defense with continuous coolant routing"
 ```
 
 ---
@@ -219,7 +253,7 @@ python3 -m unittest discover -v -s tests -p 'test_*.py'
 
 Output:
 ```text
-Ran 22 tests in 1.428s
+Ran 35 tests in 2.814s
 
 OK
 ```
