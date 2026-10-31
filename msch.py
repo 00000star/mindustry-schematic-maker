@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
 Mindustry Schematic Maker (msch) CLI.
-Pure Python Mindustry v7 schematic generator, decoder, renderer, and game sync utility.
+Pure Python Mindustry v7 schematic generator, decoder, renderer,
+game sync, and mindustry-tool.com publishing utility.
 Strictly optimized for mobile terminal display (<= 70 columns).
 """
 
 import sys
 import os
+import time
 import argparse
 import json
+
+# Enforce mobile terminal display <= 70 cols
+os.environ['COLUMNS'] = '68'
 
 # Ensure core package is in sys.path
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -21,14 +26,38 @@ try:
     from core.visual_renderer import render_schematic_png
     from core.generator import compile_from_prompt
     from core.validator import validate_schematic, ValidationResult
-    from core.sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
+    from core.sync import (
+        save_to_project,
+        sync_to_game,
+        list_project_schematics,
+        list_game_schematics,
+    )
+    from core.mindustry_tool import (
+        request_login_uri,
+        poll_login_token,
+        check_status,
+        logout,
+        publish_schematic,
+    )
 except ImportError:
     from codec import encode_schematic, decode_schematic
     from renderer import render_schematic_ascii
     from visual_renderer import render_schematic_png
     from generator import compile_from_prompt
     from validator import validate_schematic, ValidationResult
-    from sync import save_to_project, sync_to_game, list_project_schematics, list_game_schematics
+    from sync import (
+        save_to_project,
+        sync_to_game,
+        list_project_schematics,
+        list_game_schematics,
+    )
+    from mindustry_tool import (
+        request_login_uri,
+        poll_login_token,
+        check_status,
+        logout,
+        publish_schematic,
+    )
 
 
 def cmd_make(args):
@@ -59,7 +88,6 @@ def cmd_make(args):
     # Encode to base64
     _, b64_str = encode_schematic(schematic)
     print("\n[+] Mindustry Base64 Clipboard String:")
-    # Print base64 wrapped or direct
     print(b64_str)
 
     # Sync to game if requested
@@ -101,7 +129,6 @@ def cmd_decode(args):
     target = args.target
     try:
         schematic = decode_schematic(target)
-        # Format json nicely
         summary = {
             "name": schematic.get("name"),
             "description": schematic.get("description"),
@@ -191,7 +218,6 @@ def cmd_check(args):
 
 def cmd_sync(args):
     target = args.target
-    # Check if target is a file in project folder
     if not os.path.exists(target):
         project_file = os.path.join(SCRIPT_DIR, "schematics", target)
         if not project_file.endswith(".msch"):
@@ -211,40 +237,159 @@ def cmd_sync(args):
         sys.exit(1)
 
 
+def cmd_login(args):
+    if args.logout:
+        if logout():
+            print("[✓] Successfully logged out from mindustry-tool.com.")
+        else:
+            print("[-] Already logged out.")
+        return
+
+    if args.status:
+        st = check_status()
+        print("+==================================================================+")
+        print("| Mindustry Tool Authentication Status                             |")
+        print("+==================================================================+")
+        if st["logged_in"]:
+            val_str = "Valid" if st["valid"] else "Expired"
+            u_name = str(st["username"])[:40]
+            print(f"  Status   : Authenticated ({val_str})")
+            print(f"  Username : {u_name}")
+            if st.get("expires_at"):
+                exp_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(st["expires_at"]))
+                print(f"  Expires  : {exp_str}")
+        else:
+            print("  Status   : Not logged in.")
+            print("  Action   : Run 'msch login' to authenticate via Discord.")
+        print("+==================================================================+")
+        return
+
+    # Interactive OAuth flow
+    print("+==================================================================+")
+    print("| Mindustry Tool Authentication (Discord OAuth)                    |")
+    print("+==================================================================+")
+    try:
+        res = request_login_uri()
+    except Exception as err:
+        print(f"\n[!] Failed to initiate login session: {err}")
+        sys.exit(1)
+
+    session_key = res["sessionKey"]
+    login_uri = res["loginUri"]
+
+    print("\nPlease open the following URL in your browser to authorize:")
+    print()
+    print(f"  {login_uri}")
+    print()
+    print("Waiting for browser authorization (timeout: 120s)...")
+
+    try:
+        token_res = poll_login_token(session_key)
+        user = token_res.get("user") or {}
+        uname = user.get("username") or user.get("name") or "Authorized User"
+        print(f"\n[✓] Successfully authenticated as: {uname}!")
+        print(f"[+] Credentials saved to: ~/.config/mindustry/tool-auth.json")
+    except TimeoutError:
+        print("\n[-] Authentication timed out. Please run 'msch login' again.")
+        sys.exit(1)
+    except Exception as err:
+        print(f"\n[!] Login failed: {err}")
+        sys.exit(1)
+
+
+def cmd_publish(args):
+    target = args.target
+    if not os.path.exists(target):
+        project_file = os.path.join(SCRIPT_DIR, "schematics", target)
+        if not project_file.endswith(".msch"):
+            project_file += ".msch"
+        if os.path.exists(project_file):
+            target = project_file
+
+    st = check_status()
+    if not st["logged_in"]:
+        print("[-] Not authenticated with mindustry-tool.com.")
+        print("[-] Please run 'msch login' first to log in with Discord.")
+        sys.exit(1)
+
+    tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
+
+    print("+==================================================================+")
+    print("| Mindustry Tool — Publishing Schematic                            |")
+    print("+==================================================================+")
+    print(f"  Target File : {os.path.basename(target)}")
+    if args.name:
+        print(f"  Title       : {args.name}")
+    if tags:
+        print(f"  Tags        : {', '.join(tags)}")
+
+    try:
+        res = publish_schematic(
+            target,
+            tags=tags,
+            description=args.desc,
+            name=args.name,
+        )
+        schem_id = res.get("id") or "Published"
+        web_url = res.get("url") or f"https://mindustry-tool.com/schematics/{schem_id}"
+        print("\n[✓] Schematic published successfully!")
+        print(f"  ID  : {schem_id}")
+        print(f"  URL : {web_url}")
+        print("+==================================================================+")
+    except Exception as err:
+        print(f"\n[!] Failed to publish schematic: {err}")
+        sys.exit(1)
+
+
 def main():
+    os.environ["COLUMNS"] = "68"
+    fmt = lambda prog: argparse.HelpFormatter(prog, width=68, max_help_position=22)
     parser = argparse.ArgumentParser(
         prog="msch",
         description="Mindustry Schematic Maker (Mobile CLI <= 70 cols)",
+        formatter_class=fmt,
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # make
-    p_make = subparsers.add_parser("make", help="Generate schematic from prompt")
+    p_make = subparsers.add_parser("make", help="Generate schematic from prompt", formatter_class=fmt)
     p_make.add_argument("prompt", nargs="+", help="Prompt description (e.g. '4 silicon smelter')")
     p_make.add_argument("--sync", action="store_true", help="Sync directly to Mindustry game directory")
     p_make.add_argument("--image", help="Output path for visual PNG graphic")
 
     # preview
-    p_prev = subparsers.add_parser("preview", help="Render ASCII preview of a schematic")
+    p_prev = subparsers.add_parser("preview", help="Render ASCII preview of a schematic", formatter_class=fmt)
     p_prev.add_argument("target", help="File path or Base64 schematic string")
     p_prev.add_argument("--image", help="Output path for visual PNG graphic")
 
     # decode
-    p_dec = subparsers.add_parser("decode", help="Decode schematic to structured JSON")
+    p_dec = subparsers.add_parser("decode", help="Decode schematic to structured JSON", formatter_class=fmt)
     p_dec.add_argument("target", help="File path or Base64 schematic string")
 
     # list
-    p_list = subparsers.add_parser("list", help="List schematics")
+    p_list = subparsers.add_parser("list", help="List schematics", formatter_class=fmt)
     p_list.add_argument("--game", action="store_true", help="List schematics in game folder")
 
     # check
-    p_check = subparsers.add_parser("check", help="Statically check and validate schematic")
+    p_check = subparsers.add_parser("check", help="Statically check and validate schematic", formatter_class=fmt)
     p_check.add_argument("target", help="File path, Base64 string, or prompt")
     p_check.add_argument("--strict", action="store_true", help="Enable strict validation")
 
     # sync
-    p_sync = subparsers.add_parser("sync", help="Sync schematic to game folder")
+    p_sync = subparsers.add_parser("sync", help="Sync schematic to game folder", formatter_class=fmt)
     p_sync.add_argument("target", help="File path, schematic name, or base64")
+
+    # login
+    p_login = subparsers.add_parser("login", help="Discord login for mindustry-tool.com", formatter_class=fmt)
+    p_login.add_argument("--status", action="store_true", help="Check current authentication status")
+    p_login.add_argument("--logout", action="store_true", help="Log out and clear stored credentials")
+
+    # publish
+    p_pub = subparsers.add_parser("publish", help="Publish schematic to mindustry-tool.com", formatter_class=fmt)
+    p_pub.add_argument("target", help="Path to .msch file")
+    p_pub.add_argument("--name", help="Custom display title for the schematic")
+    p_pub.add_argument("--tags", help="Comma-separated tag list (e.g. 'defense,salvo')")
+    p_pub.add_argument("--desc", help="Detailed description of schematic functions")
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -264,6 +409,10 @@ def main():
         cmd_check(args)
     elif args.command == "sync":
         cmd_sync(args)
+    elif args.command == "login":
+        cmd_login(args)
+    elif args.command == "publish":
+        cmd_publish(args)
     else:
         parser.print_help()
 

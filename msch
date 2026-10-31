@@ -12,6 +12,9 @@ import time
 import argparse
 import json
 
+# Enforce mobile terminal display <= 70 cols
+os.environ['COLUMNS'] = '68'
+
 # Ensure core package is in sys.path
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -339,50 +342,53 @@ def cmd_publish(args):
 
 
 def main():
+    os.environ["COLUMNS"] = "68"
+    fmt = lambda prog: argparse.HelpFormatter(prog, width=68, max_help_position=22)
     parser = argparse.ArgumentParser(
         prog="msch",
         description="Mindustry Schematic Maker (Mobile CLI <= 70 cols)",
+        formatter_class=fmt,
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # make
-    p_make = subparsers.add_parser("make", help="Generate schematic from prompt")
+    p_make = subparsers.add_parser("make", help="Generate schematic from prompt", formatter_class=fmt)
     p_make.add_argument("prompt", nargs="+", help="Prompt description (e.g. '4 silicon smelter')")
     p_make.add_argument("--sync", action="store_true", help="Sync directly to Mindustry game directory")
     p_make.add_argument("--image", help="Output path for visual PNG graphic")
 
     # preview
-    p_prev = subparsers.add_parser("preview", help="Render ASCII preview of a schematic")
+    p_prev = subparsers.add_parser("preview", help="Render ASCII preview of a schematic", formatter_class=fmt)
     p_prev.add_argument("target", help="File path or Base64 schematic string")
     p_prev.add_argument("--image", help="Output path for visual PNG graphic")
 
     # decode
-    p_dec = subparsers.add_parser("decode", help="Decode schematic to structured JSON")
+    p_dec = subparsers.add_parser("decode", help="Decode schematic to structured JSON", formatter_class=fmt)
     p_dec.add_argument("target", help="File path or Base64 schematic string")
 
     # list
-    p_list = subparsers.add_parser("list", help="List schematics")
+    p_list = subparsers.add_parser("list", help="List schematics", formatter_class=fmt)
     p_list.add_argument("--game", action="store_true", help="List schematics in game folder")
 
     # check
-    p_check = subparsers.add_parser("check", help="Statically check and validate schematic")
+    p_check = subparsers.add_parser("check", help="Statically check and validate schematic", formatter_class=fmt)
     p_check.add_argument("target", help="File path, Base64 string, or prompt")
     p_check.add_argument("--strict", action="store_true", help="Enable strict validation")
 
     # sync
-    p_sync = subparsers.add_parser("sync", help="Sync schematic to game folder")
+    p_sync = subparsers.add_parser("sync", help="Sync schematic to game folder", formatter_class=fmt)
     p_sync.add_argument("target", help="File path, schematic name, or base64")
 
     # login
-    p_login = subparsers.add_parser("login", help="Authenticate with mindustry-tool.com via Discord")
+    p_login = subparsers.add_parser("login", help="Discord login for mindustry-tool.com", formatter_class=fmt)
     p_login.add_argument("--status", action="store_true", help="Check current authentication status")
     p_login.add_argument("--logout", action="store_true", help="Log out and clear stored credentials")
 
     # publish
-    p_pub = subparsers.add_parser("publish", help="Publish a schematic to mindustry-tool.com")
+    p_pub = subparsers.add_parser("publish", help="Publish schematic to mindustry-tool.com", formatter_class=fmt)
     p_pub.add_argument("target", help="Path to .msch file")
     p_pub.add_argument("--name", help="Custom display title for the schematic")
-    p_pub.add_argument("--tags", help="Comma-separated tag list (e.g. 'defense,salvo,early')")
+    p_pub.add_argument("--tags", help="Comma-separated tag list (e.g. 'defense,salvo')")
     p_pub.add_argument("--desc", help="Detailed description of schematic functions")
 
     if len(sys.argv) == 1:

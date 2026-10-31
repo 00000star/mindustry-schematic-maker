@@ -230,7 +230,7 @@ class TestMindustryToolAPI(unittest.TestCase):
         self.assertFalse(st3["logged_in"])
 
     def test_column_width_constraint(self):
-        """Assert all CLI status display lines adhere strictly to <= 70 cols."""
+        """Assert CLI status display and help outputs adhere strictly to <= 70 cols, and verify entrypoint parity."""
         save_auth({
             "accessToken": "tok_xyz",
             "expiresAt": time.time() + 1800,
@@ -259,6 +259,32 @@ class TestMindustryToolAPI(unittest.TestCase):
                 70,
                 f"Line {line_num} in 'msch login --status' exceeds 70 cols: '{line}'"
             )
+
+        # 1. Entrypoint parity: msch and msch.py must be identical
+        msch_py_path = os.path.join(PARENT_DIR, "msch.py")
+        if not os.path.exists(msch_py_path):
+            msch_py_path = os.path.join(CUR_DIR, "msch.py")
+        if os.path.exists(msch_py_path):
+            with open(msch_path, "r", encoding="utf-8") as f1, open(msch_py_path, "r", encoding="utf-8") as f2:
+                self.assertEqual(f1.read(), f2.read(), "msch and msch.py entrypoints are not identical")
+
+        # 2. CLI Help width constraint: all subcommand helps must fit <= 70 cols even without COLUMNS in env
+        clean_env = {k: v for k, v in os.environ.items() if k != "COLUMNS"}
+        subcmds = ["", "make", "preview", "decode", "list", "check", "sync", "login", "publish"]
+        for cmd in subcmds:
+            cmd_args = [sys.executable, msch_path]
+            if cmd:
+                cmd_args.extend([cmd, "--help"])
+            else:
+                cmd_args.append("--help")
+            help_res = subprocess.run(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=clean_env)
+            self.assertEqual(help_res.returncode, 0, f"Help failed for subcommand '{cmd}': {help_res.stderr}")
+            for l_num, l_text in enumerate(help_res.stdout.splitlines(), start=1):
+                self.assertLessEqual(
+                    len(l_text),
+                    70,
+                    f"Line {l_num} in 'msch {cmd} --help' exceeds 70 cols ({len(l_text)}): '{l_text}'"
+                )
 
 
 if __name__ == "__main__":
